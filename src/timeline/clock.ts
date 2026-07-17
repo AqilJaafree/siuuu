@@ -1,10 +1,8 @@
 import type { Timeline, Frame } from './types.js'
-
-/** score_adjustment reports Clock.Seconds = 0 regardless of when it happens. */
-const CLOCK_EXCLUDED = new Set(['score_adjustment'])
+import { CLOCK_EXCLUDED_ACTIONS } from './types.js'
 
 function usableClockFrames(tl: Timeline): Frame[] {
-  return tl.frames.filter((f) => f.clock !== null && !CLOCK_EXCLUDED.has(f.action))
+  return tl.frames.filter((f) => f.clock !== null && !CLOCK_EXCLUDED_ACTIONS.has(f.action))
 }
 
 /** Frames whose match clock falls inside [clockStart, clockEnd]. */

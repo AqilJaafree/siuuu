@@ -1,5 +1,26 @@
 import type { RawScore } from '../txline/types.js'
 
+/**
+ * Actions whose Clock.Seconds is meaningless — they report 0 regardless of when
+ * they actually occur, so they must never count as clock coverage.
+ *
+ *   score_adjustment  — always reports Clock.Seconds: 0 whenever it lands.
+ *   clock_adjustment  — reports Clock.Seconds: 0 / Running: false as
+ *                       end-of-stream finalisation boilerplate. Verified in all
+ *                       six corpus fixtures as the last two frames before the
+ *                       status transitions to finished (e.g. 18209181 Seq
+ *                       1112-1113, StatusId 5, right before game_finalised).
+ *
+ * Do NOT extend this list. Ten actions carry Clock: 0, but most — `kickoff`
+ * above all — are legitimately AT clock 0 and are real coverage. Only these two
+ * report a clock that does not correspond to when they happened.
+ *
+ * Single source of truth: coverage (build.ts) and window lookups (clock.ts)
+ * must agree on what a usable clock frame is, or the verifier can count
+ * boilerplate as coverage and fail to return UNVERIFIABLE.
+ */
+export const CLOCK_EXCLUDED_ACTIONS = new Set(['score_adjustment', 'clock_adjustment'])
+
 export interface Frame {
   fixtureId: number
   action: string

@@ -1,21 +1,11 @@
 import type { Frame, Timeline, Coverage } from './types.js'
+import { CLOCK_EXCLUDED_ACTIONS } from './types.js'
 import type { FixtureCapture } from '../txline/corpus.js'
 import { normalizeScoreFrame } from '../txline/normalize.js'
 
-/**
- * Frames whose Clock is meaningless for coverage. score_adjustment reports
- * Clock 0 regardless of when it happens. clock_adjustment ALSO reports
- * Clock.Seconds: 0 / Running: false as end-of-match finalisation boilerplate —
- * verified present in all six corpus fixtures, always as the last two frames
- * before status transitions to "finished" (e.g. 18209181 Seq 1112-1113,
- * StatusId 5, right before game_finalised). Without this exclusion every
- * fixture's minClock collapses to 0 regardless of true coverage.
- */
-const CLOCK_EXCLUDED = new Set(['score_adjustment', 'clock_adjustment'])
-
 function computeCoverage(frames: Frame[]): Coverage {
   const clocks = frames
-    .filter((f) => f.clock !== null && !CLOCK_EXCLUDED.has(f.action))
+    .filter((f) => f.clock !== null && !CLOCK_EXCLUDED_ACTIONS.has(f.action))
     .map((f) => f.clock as number)
     .sort((a, b) => a - b)
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Heart, MessageSquare, Share2 } from 'lucide-react'
 import type { FeedClip } from '../app/lib/feed.js'
 import { StatusPill } from './StatusPill.js'
+import { ConnectButton } from './ConnectButton.js'
 import { clock } from '../app/lib/format.js'
 
 /** `24:32 · goal → action_discarded · Seq 534` — the voice. Facts, no adjectives. */
@@ -37,9 +38,9 @@ export function Home({ clips, onProof }: { clips: FeedClip[]; onProof: (id: stri
         >
           SIUUU
         </span>
-        <span className="btn" style={{ background: 'var(--paper)', color: '#111', padding: '6px 14px', fontSize: 11, boxShadow: '3px 3px 0 rgba(0,0,0,.4)' }}>
-          LOGIN
-        </span>
+        {/* Connect is available, never required. The feed below renders for everyone —
+            gating proofs behind a wallet would gate the product behind a wallet. */}
+        <ConnectButton dark />
       </div>
 
       <div className="noscroll" style={{ flex: 1, overflowY: 'auto', scrollSnapType: 'y mandatory' }}>

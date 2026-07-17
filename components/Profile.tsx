@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import type { FeedClip } from '../app/lib/feed.js'
 import { StatusPill } from './StatusPill.js'
+import { ConnectButton } from './ConnectButton.js'
 import { clock } from '../app/lib/format.js'
 
 const SPONSORS = [
@@ -26,9 +27,7 @@ export function Profile({ clips, onProof }: { clips: FeedClip[]; onProof: (id: s
         <span className="disp" style={{ fontSize: 22, letterSpacing: '-.5px' }}>
           SIUUU
         </span>
-        <span className="btn" style={{ background: 'var(--card)', color: 'var(--ink)', padding: '6px 14px', fontSize: 11 }}>
-          LOGIN
-        </span>
+        <ConnectButton />
       </div>
 
       <div className="col noscroll" style={{ flex: 1, padding: '18px 16px', gap: 16, overflowY: 'auto' }}>

@@ -350,3 +350,77 @@ body {
 .noscroll::-webkit-scrollbar {
   display: none;
 }
+
+/* ============================================================================
+   Wallet adapter modal, dragged into the design language.
+
+   @solana/wallet-adapter-react-ui ships rounded corners, a gradient wordmark and a
+   backdrop blur. None of those exist in this product: glass hides construction and
+   this style shows it. The overrides below are structural, not decorative — without
+   them the one third-party surface in the app is the only thing that looks like a
+   different product.
+   ========================================================================== */
+.wallet-adapter-modal-wrapper {
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--border-heavy);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* Flat ink, matching the proof sheet's scrim. No blur. */
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: none;
+}
+
+.wallet-adapter-modal-title {
+  font-family: var(--font-display), 'Arial Black', sans-serif;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.wallet-adapter-modal-list li,
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: var(--card);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  box-shadow: var(--shadow);
+  font-family: var(--font-body), sans-serif;
+  font-weight: 700;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--sunk);
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: var(--shadow-press);
+}
+
+/* "Detected" and the more/less toggle are facts about the machine. Mono. */
+.wallet-adapter-modal-list .wallet-adapter-button span,
+.wallet-adapter-modal-list-more {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  color: var(--ink);
+  opacity: 0.7;
+}
+
+.wallet-adapter-modal-button-close {
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  box-shadow: var(--shadow-press);
+}
+
+.wallet-adapter-modal-button-close svg {
+  fill: var(--ink);
+}

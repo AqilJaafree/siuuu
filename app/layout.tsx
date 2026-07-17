@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Archivo_Black, Inter, JetBrains_Mono } from 'next/font/google'
+import { WalletProviders } from '../components/WalletProviders.js'
 import './globals.css'
 
 // Self-hosted via next/font. No FOUT, no external request at runtime.
@@ -27,7 +28,12 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   // App name is always SIUUU. All caps, four Us.
   title: 'SIUUU',
-  description: 'World Cup clips, verified against TXLine and anchored on Solana.',
+  // NOT "anchored on Solana". Nothing is anchored — no card is submitted on-chain.
+  // What actually happens is the other direction: a stat claim is CHECKED against
+  // roots already on Solana via validateStat, and only when the stat exists. The
+  // product's whole pitch is that it does not overclaim, so its own <meta> cannot.
+  description:
+    'World Cup clips, verified against TXLine. Where the stat exists, proven against Solana.',
 }
 
 export const viewport: Viewport = {
@@ -39,7 +45,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <WalletProviders>{children}</WalletProviders>
+      </body>
     </html>
   )
 }

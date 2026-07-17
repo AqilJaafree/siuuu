@@ -1,0 +1,352 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   SIUUU tokens — docs/design-guidelines.md §2. Colour is information, not styling.
+   ========================================================================== */
+:root {
+  /* Structure */
+  --ink: #000000;
+  --paper: #fdfbf7;
+
+  /* Verification states — semantic, never decorative */
+  --verified: #00e054;
+  --overturned: #ff4d00;
+  --rejected: #e5e5e5;
+  --pending: #ffd600;
+
+  /* Product */
+  --impact: #ff006e;
+  --controv: #ff4d00;
+  --sponsor: #6d3bff;
+  --live: #ff0000;
+
+  /* Surfaces */
+  --card: #ffffff;
+  --sunk: #f0ede6;
+
+  /* Structure tokens */
+  --border: 3px solid var(--ink);
+  --border-heavy: 5px solid var(--ink);
+  --radius: 0;
+  --shadow: 4px 4px 0 var(--ink);
+  --shadow-lg: 8px 8px 0 var(--ink);
+  --shadow-press: 2px 2px 0 var(--ink);
+}
+
+/* Dark mode flips paper/card/ink. The chroma colours DO NOT change — a VERIFIED
+   badge means the same thing at 2am. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0a0a0a;
+    --card: #141414;
+    --ink: #fdfbf7;
+    --sunk: #1c1c1c;
+    --rejected: #3a3a3a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Type roles ---------------------------------------------------------- */
+.disp {
+  font-family: var(--font-display), 'Arial Black', sans-serif;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+
+/* Facts are mono. Prose is Inter. Never mix them up. */
+.mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+
+/* The counterpart to .mono, and it earns its keep: `.ph`/`.phd` set a `font`
+   SHORTHAND, which cascades mono onto every child. Prose nested inside a
+   placeholder therefore renders as machine fact unless it says otherwise —
+   exactly the mix-up the type rule forbids. */
+.prose {
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+.lbl {
+  font-family: var(--font-body), sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---- Structure ----------------------------------------------------------- */
+.row {
+  display: flex;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+}
+
+.sunk {
+  background: var(--sunk);
+  border: 3px solid var(--ink);
+}
+
+/* Placeholder hatching. Used ONLY where there is genuinely no asset — an honest
+   empty, never a fake render. */
+.ph {
+  background: repeating-linear-gradient(45deg, var(--sunk) 0 9px, var(--paper) 9px 18px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--ink) 40%, transparent);
+  font: 400 11px var(--font-mono), monospace;
+  text-align: center;
+}
+
+.phd {
+  background: repeating-linear-gradient(45deg, #1c1c1c 0 9px, #242424 9px 18px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  font: 400 11px var(--font-mono), monospace;
+  text-align: center;
+}
+
+/* ---- Status badge — the one sanctioned radius exception. A pill reads as a
+   stamp, and stamps are what verification badges are. ----------------------- */
+.pill {
+  border: 2px solid #111;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-family: var(--font-body), sans-serif;
+  font-weight: 700;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #111;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Badge state change: no transition. Truth doesn't fade in. */
+.pill,
+.pill * {
+  transition: none;
+}
+
+/**
+ * The chroma fills (verified/overturned/pending) are identical in both themes, so
+ * their ink-dark text above is right in both. The NEUTRAL fills — REJECTED and
+ * UNVERIFIABLE — flip with the theme, and #111 on dark grey is unreadable. These
+ * take the theme's ink instead.
+ *
+ * Never colour alone: a viewer must be able to READ the word REJECTED, which makes
+ * this a correctness fix rather than a polish one.
+ */
+.pill--neutral {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+/* ---- Button — the signature interaction. Hard shadow, physical press. ----- */
+.btn {
+  border: 2px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: var(--shadow-press);
+}
+
+/* A button with no shadow is visibly not pressable — the affordance disappears
+   rather than greying out. */
+.btn:disabled {
+  box-shadow: none;
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.inp {
+  border: 3px solid var(--ink);
+  background: var(--card);
+  color: var(--ink);
+  font: 400 13px var(--font-body), sans-serif;
+  padding: 11px 12px;
+  width: 100%;
+  border-radius: 0;
+  outline: none;
+}
+
+.inp:focus {
+  outline: 3px solid var(--impact);
+  outline-offset: 2px;
+}
+
+.chip {
+  border: 2px solid var(--sponsor);
+  box-shadow: 3px 3px 0 var(--sponsor);
+  padding: 8px 11px;
+  font: 700 11px var(--font-body), sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 0;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+
+.chip:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--sponsor);
+}
+
+.chip.on {
+  background: var(--sponsor);
+  color: #fff;
+}
+
+.rail {
+  width: 46px;
+  height: 46px;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font: 700 10px var(--font-body), sans-serif;
+  cursor: pointer;
+  transition: transform 90ms ease-out;
+  border-radius: 0;
+}
+
+.rail:active {
+  transform: translate(2px, 2px);
+}
+
+.navitem {
+  background: none;
+  border: none;
+  font: 700 11px var(--font-body), sans-serif;
+  color: color-mix(in srgb, var(--ink) 40%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 0;
+  /* Touch targets: 44px minimum. */
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.navitem.on {
+  color: var(--ink);
+}
+
+/* ---- Focus: visible, on-brand, never removed. ---------------------------- */
+:focus-visible {
+  outline: 3px solid var(--impact);
+  outline-offset: 3px;
+}
+
+/* ---- Card hover (pointer only). On touch, no hover state at all. --------- */
+@media (hover: hover) and (pointer: fine) {
+  .lift {
+    transition:
+      transform 120ms ease-out,
+      box-shadow 120ms ease-out;
+  }
+  .lift:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+}
+
+/* ---- Live indicator: hard square, opacity pulse. No glow, no scale. ------ */
+@keyframes livepulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: var(--live);
+  animation: livepulse 1.5s steps(2, end) infinite;
+}
+
+/* ---- Page enter: stagger children 40ms, translate-y 8px -> 0, 200ms ------ */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.enter {
+  animation: enter 200ms ease-out both;
+}
+
+/* The design already reads correctly with zero motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .enter {
+    animation: none;
+  }
+}
+
+/* Hide scrollbars on the snap feed without hiding the scroll. */
+.noscroll {
+  scrollbar-width: none;
+}
+.noscroll::-webkit-scrollbar {
+  display: none;
+}

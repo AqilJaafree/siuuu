@@ -199,7 +199,7 @@ Assertable moment types, mapped to the feed:
 | Claim | Backing actions |
 |---|---|
 | Goal | `goal`, `Confirmed: true`, no later discard |
-| **VAR overturned this goal** | `var(Type=Goal)` + `var_end(Outcome=Overturned)`, **plus** `action_discarded` on an adjacent goal `Id` as corroboration |
+| **VAR overturned this goal** | ALL THREE: `var(Type=Goal)` + `var_end(Outcome=Overturned)` in context; **a discarded goal in the clip window**; and the two tied temporally. Neither half alone is sufficient — see below. |
 | **VAR overturned this penalty** | `var(Type=Penalty)` + `var_end(Outcome=Overturned)` |
 | **Referee carded the wrong player** | `var(Type=MistakenIdentity)` + `var_end(Outcome=Overturned)` |
 | VAR checked and the decision stood | `var(...)` + `var_end(Outcome=Stands)` |
@@ -210,17 +210,29 @@ Assertable moment types, mapped to the feed:
 | Penalty outcome | `penalty_outcome` (`Data.Outcome`) |
 | Scoreline correction | `score_adjustment` |
 
-**`action_discarded` on a goal is not a disallowed goal.** This is the single
-easiest way to ship a verifier that confidently states something false. All four
-discarded goals in the corpus were **never `Confirmed: true`** — a goal is flashed
-provisionally, VAR reviews it, VAR kills it, and the operator withdraws the
-provisional goal. The discard is the *consequence*; the `var_end` is the
-*evidence*. Two of the four have a VAR pair behind them and two do not — and for
-those two you cannot say why the goal went away.
+**Two symmetrical traps here, and both ship a verifier that lies.**
 
-**Match on the VAR pair. Use the discard only as corroboration.** A verifier that
-treats every discarded goal as "VAR disallowed it" is wrong in half the cases in
-this corpus, and being wrong is the one thing this product cannot survive.
+**Trap 1 — a discard alone is not a disallowed goal.** All four discarded goals in
+the corpus were **never `Confirmed: true`**: a goal is flashed provisionally, VAR
+reviews it, VAR kills it, the operator withdraws the provisional goal. Two of the
+four have a VAR pair behind them; two do not, and for those you cannot say *why*
+the goal went away. Treating every discard as "VAR disallowed it" is wrong in half
+the corpus.
+
+**Trap 2 — a VAR pair alone is not proof either, and this one is worse.** 18237038
+holds a goal that **stood** (`Id` 551 @3455, confirmed, never discarded — one of
+Spain's two) and the goal VAR **killed** (`Id` 570 @3629), 174s apart. The VAR at
+3641 is 186s after the goal that stood, so a clip of Spain's *legitimate* goal has
+a `Goal`/`Overturned` pair inside any useful context window. Match on the VAR pair
+alone and that clip announces a legitimate semi-final goal was disallowed.
+
+**Both halves, tied to each other.** Require the VAR pair, require a discarded goal
+in the clip window, and require them within `VAR_CONTEXT_SEC` of each other. Tie
+temporally, not by `Id` adjacency — 570/571 are adjacent, 490/492 are not.
+
+**The tell:** an evidence array with no goal in it. Any "VAR overturned this goal"
+verdict that cannot name the goal it killed is a coincidence of timing, not
+evidence. Being wrong is the one thing this product cannot survive.
 
 ### Step 4 — Impact and Controversy (two axes, not one)
 

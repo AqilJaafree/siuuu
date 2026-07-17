@@ -1652,6 +1652,7 @@ export function verify(tl: Timeline, claim: Claim): VerifyResult {
 
   const handlers: Record<ClaimKind, () => VerifyResult> = {
     var_overturned_goal: () => {
+      // Both directions must hold. Either alone states something false.
       const d = varInContext(tl, claim, (x) => x.type === 'Goal' && x.outcome === 'Overturned')
       if (!d) {
         return no(
@@ -1659,11 +1660,33 @@ export function verify(tl: Timeline, claim: Claim): VerifyResult {
             `A discarded goal alone does not prove VAR. ${describeWindow(tl, claim)}`,
         )
       }
-      const matched = [varMatch(d)]
-      // Corroboration: a goal discarded near the review.
-      const goal = eventsWithAction(tl, claim, 'goal').find((e) => e.discarded)
-      if (goal) matched.push(eventMatch(goal))
-      return ok(`VAR reviewed a Goal and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`, matched)
+
+      // A VAR pair alone is NOT enough — it may have overturned a DIFFERENT goal.
+      // 18237038 holds both: Id 551 @3455 is Confirmed and STOOD (one of Spain's
+      // two goals), while Id 570 @3629 is the goal VAR killed, 186s later. With
+      // the VAR pair as sole evidence, a clip of the goal that STOOD verifies as
+      // "VAR overturned this goal" — telling the world a legitimate goal was
+      // disallowed. Require a discarded goal in the window AND tie it temporally
+      // to the review.
+      const goal = eventsWithAction(tl, claim, 'goal').find(
+        (e) =>
+          e.discarded &&
+          e.clock !== null &&
+          d.clockStart !== null &&
+          Math.abs(e.clock - d.clockStart) <= VAR_CONTEXT_SEC,
+      )
+      if (!goal) {
+        return no(
+          `A VAR Goal/Overturned decision exists at clock ${d.clockStart}, but no discarded ` +
+            `goal in this window is tied to it — the review may have overturned a different ` +
+            `goal. ${describeWindow(tl, claim)}`,
+        )
+      }
+
+      return ok(
+        `VAR reviewed a Goal and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`,
+        [varMatch(d), eventMatch(goal)],
+      )
     },
 
     var_overturned_penalty: () => {
@@ -1837,6 +1860,33 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
   })
 })
 
+describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', () => {
+  // The mirror of the discard-without-VAR trap, and just as fatal.
+  // 18237038 holds a goal that STOOD (Id 551 @3455, Confirmed, never discarded)
+  // and a goal VAR killed (Id 570 @3629), 186s apart. A clip of the FORMER sits
+  // within ±180s of the VAR at 3641. Matching on the VAR pair alone tells the
+  // world Spain's legitimate goal was disallowed.
+  it('18237038: a clip of the goal that STOOD must NOT verify as a VAR overturn', () => {
+    const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'var_overturned_goal'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).toMatch(/different goal/i)
+  })
+
+  it('18237038: that same clip DOES verify as a clean confirmed goal', () => {
+    const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].eventId).toBe(551)
+  })
+
+  it('a verified VAR overturn always NAMES the goal it killed', () => {
+    // Evidence must contain the goal, not just the review. An evidence array with
+    // no goal in it is how the bug above hid.
+    const r = verify(tl(18237038), claim(18237038, 3625, 3655, 'var_overturned_goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents.some((e) => e.eventId === 570)).toBe(true)
+  })
+})
+
 describe('PRECISION: outcome must match — Stands is not Overturned', () => {
   it('18209181 Id 300 is Penalty/Stands — REJECTED as var_overturned_penalty', () => {
     expect(verify(tl(18209181), claim(18209181, 1540, 1590, 'var_overturned_penalty')).status).toBe('REJECTED')
@@ -1874,10 +1924,17 @@ describe('PRECISION: the VAR context window does not over-reach', () => {
 - [ ] **Step 2: Run the precision tests**
 
 Run: `npx vitest run tests/verify/precision.test.ts`
-Expected: PASS — 11 tests.
+Expected: PASS — 15 tests.
 
 If `18213979 Id 410` verifies as `var_overturned_goal`, `VAR_CONTEXT_SEC` is too
 wide. The nearest VAR is 380s away; the constant must stay well under that.
+
+**Prove these tests can fail.** A passing guard proves nothing until you have seen
+it fire. Temporarily set `VAR_CONTEXT_SEC = 400` in `src/verify/verifier.ts` and
+re-run. Exactly two tests must fail — both the `18213979 Id 410` cases — because
+the widened window makes a goal with no VAR behind it falsely verify as a VAR
+overturn. That is the exact false claim this file exists to prevent. Revert to
+`180` and confirm 12/12 green before committing.
 
 - [ ] **Step 3: Run the whole suite**
 

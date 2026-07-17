@@ -219,8 +219,38 @@ So there are two genuinely different claims here and they must not be conflated:
   **2 cases.**
 
 A verifier that treats all `action_discarded`-on-goal as "disallowed goal" makes
-a false claim in half the cases in this corpus. Match on the **VAR pair**, and
-use the discard only as corroboration.
+a false claim in half the cases in this corpus.
+
+### …and the mirror trap: a VAR pair alone proves nothing either
+
+The obvious correction — "match on the VAR pair instead" — is **also wrong**, and
+fails in the same fixture.
+
+18237038 contains two goals 174s apart:
+
+| Goal `Id` | Clock | Confirmed | Discarded | What it is |
+|---|---|---|---|---|
+| **551** | 3455 | **true** | **no** | One of Spain's two goals. It **stood**. |
+| 570 | 3629 | false | yes | The goal VAR killed |
+
+VAR `Id` 571 sits at 3641 — **186s after the goal that stood**. So a 30s clip of
+Spain's legitimate goal at 3440–3470 has a `Goal`/`Overturned` VAR pair inside any
+context window wide enough to be useful (±180s). Match on the VAR pair alone and
+that clip verifies as *"VAR overturned this goal"* — announcing that a legitimate
+World Cup semi-final goal was disallowed.
+
+**Both halves are required, and they must be tied to each other:**
+
+1. a `var(Type=Goal)` + `var_end(Outcome=Overturned)` pair in context, **and**
+2. a **discarded goal in the clip window**, **and**
+3. the two within `VAR_CONTEXT_SEC` of each other.
+
+Tie them **temporally, not by `Id` adjacency** — 570/571 are adjacent but 490/492
+are not, so adjacency does not generalise.
+
+The tell that this bug is present: **the evidence array contains no goal.** Any
+"VAR overturned this goal" verdict that cannot name the goal it killed is not
+evidence, it is a coincidence of timing.
 
 ### Timing and control
 

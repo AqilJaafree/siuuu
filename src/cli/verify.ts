@@ -77,6 +77,15 @@ export function runVerify(args: CliArgs): VerifiedCard {
     result,
     impact: impact?.score ?? 0,
     controversy,
+    // FEED_ATTESTED, always, until `--prove` actually calls validateStat. This card
+    // is a read of TxODDS's corpus capture and nothing more. Deriving MERKLE_PROVEN
+    // from "a statKey exists for this claim" would assert a proof we never ran.
+    validation: {
+      tier: 'FEED_ATTESTED',
+      statKey: null,
+      seq: result.seqRange?.[0] ?? -1,
+      network: 'devnet',
+    },
   })
 
   return { ...card, hash: proofHash(card), impactEvidence: impact?.evidence ?? 'no odds coverage' }

@@ -1,6 +1,39 @@
 import { createHash } from 'node:crypto'
 import type { MatchedEvent, VerifyResult, VerifyStatus, ClaimKind } from '../verify/types.js'
 
+/**
+ * How much a claim is actually worth.
+ *
+ * MERKLE_PROVEN — the stat is proven against daily_scores_roots on-chain, no
+ *   intermediary. Trust rests on mathematics.
+ * FEED_ATTESTED — TxODDS's operator said it and we anchored a hash of them saying
+ *   it. There is no statKey for a VAR decision, so every VAR claim lands here.
+ *   Trust rests on the operator.
+ *
+ * These are NOT interchangeable, and the Proof Card must render them as visibly
+ * different things. A product whose pitch is "we don't overclaim" cannot overclaim
+ * about its own proof.
+ */
+export type ProofTier = 'MERKLE_PROVEN' | 'FEED_ATTESTED'
+
+export interface Validation {
+  tier: ProofTier
+  /**
+   * null for every feed-attested claim. Not a failure — the honest answer.
+   *
+   * Always an un-prefixed TOTAL key (1-8) from `src/chain/statkey.ts`. A key > 8
+   * means the documented period encoding has crept back in; the live endpoint
+   * reports those empty.
+   */
+  statKey: number | null
+  seq: number
+  network: 'mainnet' | 'devnet'
+  /** Set once validateStat has actually returned true. */
+  verifiedOnChain?: boolean
+  /** The daily_scores_roots PDA the proof was checked against. */
+  rootsPda?: string
+}
+
 export interface ProofCard {
   fixtureId: number
   clockStart: number
@@ -15,6 +48,12 @@ export interface ProofCard {
   impact: number
   controversy: number
   reason: string
+  /**
+   * What the claim is actually backed by. Required, and inside the canonical
+   * serialisation — the tier is bound into the hash, so a card cannot be silently
+   * upgraded from attested to proven after the fact.
+   */
+  validation: Validation
 }
 
 /**
@@ -50,6 +89,8 @@ export interface BuildProofCardInput {
   result: VerifyResult
   impact: number
   controversy: number
+  /** Explicit and required. There is no default tier — guessing one would overclaim. */
+  validation: Validation
 }
 
 export function buildProofCard(input: BuildProofCardInput): ProofCard {
@@ -65,5 +106,6 @@ export function buildProofCard(input: BuildProofCardInput): ProofCard {
     impact: input.impact,
     controversy: input.controversy,
     reason: input.result.reason,
+    validation: input.validation,
   }
 }

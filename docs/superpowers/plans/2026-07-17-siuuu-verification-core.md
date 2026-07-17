@@ -1953,7 +1953,7 @@ describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', 
   it('18237038: a clip of the goal that STOOD must NOT verify as a VAR overturn', () => {
     const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'var_overturned_goal'))
     expect(r.status).toBe('REJECTED')
-    expect(r.reason).toMatch(/different goal/i)
+    expect(r.reason).toMatch(/different incident/i)
   })
 
   it('18237038: that same clip DOES verify as a clean confirmed goal', () => {

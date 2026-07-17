@@ -39,6 +39,17 @@ export interface DemoCase {
   title: string
   blurb: string
   fixtureLabel: string
+  /**
+   * The clip's own bytes, when they exist and are THIS moment.
+   *
+   * Exactly one card has them. The file is real France-Morocco footage, OCR'd by
+   * `src/ocr/`, and the `1-0 -> 2-0` it shows pins to clock 3922 — inside `c-goal`'s
+   * window and nowhere else. Putting it on any other card would caption Argentina's
+   * red card with French footage, which is the invented-label defect this product
+   * exists to refuse. Absent means absent: a card with no bytes says NO CLIP BYTES.
+   */
+  clipSrc?: string
+  clipPoster?: string
 }
 
 const CASES: DemoCase[] = [
@@ -107,6 +118,12 @@ const CASES: DemoCase[] = [
     title: 'France’s second — proven on Solana',
     blurb: 'A goal is a stat in the tree. The market had already called it: impact 19, and nobody argued.',
     fixtureLabel: 'France vs Morocco · QF',
+    // The only card with footage, and it is evidence rather than decoration: this is
+    // the clip `scripts/probe-clip.ts` ran on. Its scoreline goes 1-0 -> 2-0, that
+    // change happens exactly once in 18209181, and it happens at clock 3922 — inside
+    // this card's 3910-3940 window. The video and the proof are the same moment.
+    clipSrc: '/clips/france-morocco-3922.mp4',
+    clipPoster: '/clips/france-morocco-3922.jpg',
   },
 ]
 

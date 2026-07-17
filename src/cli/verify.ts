@@ -9,7 +9,7 @@ import { lookupProven, type ProvenStat } from '../chain/proven.js'
 import { PROVEN_STATS } from '../generated/proven-stats.js'
 import type { ClaimKind } from '../verify/types.js'
 
-const CLAIM_KINDS: ClaimKind[] = [
+export const CLAIM_KINDS: ClaimKind[] = [
   'goal', 'var_overturned_goal', 'var_overturned_penalty', 'mistaken_identity',
   'var_stands', 'goal_withdrawn', 'red_card', 'yellow_card', 'penalty',
 ]

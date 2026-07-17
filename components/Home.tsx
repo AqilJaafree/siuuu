@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Heart, MessageSquare, Share2 } from 'lucide-react'
 import type { FeedClip } from '../app/lib/feed.js'
 import { StatusPill } from './StatusPill.js'
@@ -52,24 +52,82 @@ export function Home({ clips, onProof }: { clips: FeedClip[]; onProof: (id: stri
   )
 }
 
+/**
+ * The clip's own bytes, for the one card that has them.
+ *
+ * `contain`, not `cover`: the footage is 1268x662 and the tile is a phone portrait, so
+ * covering would crop the broadcast score bug straight off the frame. That bug is the
+ * evidence — it is what the OCR read to pin this moment. Cropping it to fill the tile
+ * would be styling away the thing the card is about.
+ *
+ * Reduced motion means no autoplay, not a still: the user gets the poster and a
+ * control, and decides. `muted` + `playsInline` because a feed that shouts is a feed
+ * people mute at the OS level, and iOS refuses inline autoplay without both.
+ */
+function ClipVideo({ src, poster, label }: { src: string; poster?: string; label: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [manual, setManual] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduced) {
+      setManual(true)
+      return
+    }
+    // Autoplay can still be refused by policy. That is not an error worth surfacing —
+    // fall back to controls, which is the same place reduced-motion users start.
+    void el.play().catch(() => setManual(true))
+  }, [])
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      poster={poster}
+      muted
+      playsInline
+      loop
+      preload="metadata"
+      controls={manual}
+      aria-label={`Clip: ${label}`}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        background: '#000',
+        borderRadius: 0,
+      }}
+    />
+  )
+}
+
 function ClipTile({ clip, onProof }: { clip: FeedClip; onProof: () => void }) {
   const [liked, setLiked] = useState(false)
   const { card } = clip
 
   return (
     <div className="phd" style={{ height: 653, scrollSnapAlign: 'start', position: 'relative' }}>
-      {/* No clip bytes exist for these fixtures. An honest hatched empty that names
-          what is missing, rather than a stock video pretending to be the moment. */}
-      <div className="col" style={{ alignItems: 'center', gap: 6, padding: 24, textAlign: 'center' }}>
-        <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
-          NO CLIP BYTES
-        </span>
-        <span className="mono" style={{ fontSize: 9, color: 'rgba(255,255,255,.35)', lineHeight: 1.5 }}>
-          fixture {card.fixtureId}
-          <br />
-          {clip.fixtureLabel}
-        </span>
-      </div>
+      {clip.clipSrc ? (
+        <ClipVideo src={clip.clipSrc} poster={clip.clipPoster} label={clip.fixtureLabel} />
+      ) : (
+        // No clip bytes exist for these fixtures. An honest hatched empty that names
+        // what is missing, rather than a stock video pretending to be the moment —
+        // or worse, this card's neighbour's footage pretending to be this moment.
+        <div className="col" style={{ alignItems: 'center', gap: 6, padding: 24, textAlign: 'center' }}>
+          <span className="mono" style={{ fontSize: 11, color: 'rgba(255,255,255,.55)' }}>
+            NO CLIP BYTES
+          </span>
+          <span className="mono" style={{ fontSize: 9, color: 'rgba(255,255,255,.35)', lineHeight: 1.5 }}>
+            fixture {card.fixtureId}
+            <br />
+            {clip.fixtureLabel}
+          </span>
+        </div>
+      )}
 
       <StatusPill status={card.status} onOpen={onProof} style={{ position: 'absolute', top: 58, left: 16 }} />
 

@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
  * Tested against google/gemini-2.5-flash-lite: identical reads to full flash at
  * a third of the price. Override with OCR_MODEL.
  */
-const MODEL = process.env.OCR_MODEL ?? 'google/gemini-2.5-flash-lite'
+export const MODEL = process.env.OCR_MODEL ?? 'google/gemini-2.5-flash-lite'
 
 export interface OcrRead {
   clock: string | null

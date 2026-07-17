@@ -174,8 +174,13 @@ dist/
 
 - [ ] **Step 5: Install and verify the toolchain**
 
-Run: `npm install && npm run typecheck`
-Expected: install succeeds; `tsc --noEmit` exits 0 with no output (no source files yet).
+Run: `npm install`
+Expected: install succeeds.
+
+Do **not** run `npm run typecheck` yet. With zero files matching `include`, tsc
+exits non-zero with `TS18003: No inputs were found in config file`. That is
+correct tsc behaviour, not a config bug — Task 2 adds the first source file and it
+resolves itself. Leave `tsconfig.json` alone.
 
 - [ ] **Step 6: Commit**
 
@@ -574,6 +579,23 @@ export interface Frame {
   connectionId: number | null
 }
 
+/**
+ * Actions that report a Clock they do not occur at.
+ *
+ * Both report `Clock.Seconds: 0` regardless of when they happen; `clock_adjustment`
+ * additionally appears as end-of-stream finalisation boilerplate (`Running: false`).
+ * Excluding only `score_adjustment` collapses every fixture's minClock to 0 and
+ * hides the real start-of-stream gap.
+ *
+ * Ten actions carry `Clock: 0`. Do NOT add `kickoff` — it is legitimately at clock
+ * 0 and is real coverage. These two are the ones reporting a meaningless clock.
+ *
+ * Defined ONCE here. `build.ts` and `clock.ts` both import it — they previously
+ * held diverging copies, and since the verifier decides coverage via `clock.ts`,
+ * the drift would have counted boilerplate as real coverage.
+ */
+export const CLOCK_EXCLUDED_ACTIONS = new Set(['score_adjustment', 'clock_adjustment'])
+
 export interface Coverage {
   /** Lowest clock value with a real frame. */
   minClock: number
@@ -790,7 +812,7 @@ describe('buildTimeline', () => {
 })
 
 describe('timelineFromCapture (real corpus)', () => {
-  it('reports 18209181 stream starting at 19:19 when historical is not merged', () => {
+  it('reports 18209181 real coverage starting at 19:19 when historical is not merged', () => {
     const cap = loadFixture(CORPUS_ROOT, 18209181)
     const tl = timelineFromCapture(cap, { mergeHistorical: false })
     expect(tl.coverage.minClock).toBe(1159)
@@ -831,15 +853,13 @@ Create `src/timeline/build.ts`:
 
 ```ts
 import type { Frame, Timeline, Coverage } from './types.js'
+import { CLOCK_EXCLUDED_ACTIONS } from './types.js'
 import type { FixtureCapture } from '../txline/corpus.js'
 import { normalizeScoreFrame } from '../txline/normalize.js'
 
-/** Frames whose Clock is meaningless for coverage. score_adjustment reports Clock 0. */
-const CLOCK_EXCLUDED = new Set(['score_adjustment'])
-
 function computeCoverage(frames: Frame[]): Coverage {
   const clocks = frames
-    .filter((f) => f.clock !== null && !CLOCK_EXCLUDED.has(f.action))
+    .filter((f) => f.clock !== null && !CLOCK_EXCLUDED_ACTIONS.has(f.action))
     .map((f) => f.clock as number)
     .sort((a, b) => a - b)
 
@@ -879,13 +899,20 @@ export function timelineFromCapture(cap: FixtureCapture, opts: TimelineOptions):
     return buildTimeline(cap.fixtureId, streamed)
   }
 
-  // seq is monotonic per fixture, so it is a safe dedupe key across the overlap.
-  const seen = new Set(streamed.map((f) => f.seq))
-  const backfill = cap.historical
-    .map(normalizeScoreFrame)
-    .filter((f) => !seen.has(f.seq))
+  // 18209181's own scores.ndjson contains exact duplicate lines (1286 lines, 873
+  // unique Seq) from operator retransmission, so dedupe the COMBINED set, not just
+  // historical against streamed. Verified safe: zero Seq values carry differing
+  // payloads corpus-wide, so first-seen-wins never drops a Confirmed:true frame.
+  const backfill = cap.historical.map(normalizeScoreFrame)
+  const seen = new Set<number>()
+  const merged: Frame[] = []
+  for (const f of [...backfill, ...streamed]) {
+    if (seen.has(f.seq)) continue
+    seen.add(f.seq)
+    merged.push(f)
+  }
 
-  return buildTimeline(cap.fixtureId, [...backfill, ...streamed])
+  return buildTimeline(cap.fixtureId, merged)
 }
 ```
 
@@ -1237,8 +1264,9 @@ describe('tsWindowForClock', () => {
   })
 
   it('returns null for a window with no frames (a real feed gap)', () => {
-    // 18218149's stream starts at 28:39; clock 100 is before any frame
-    expect(tsWindowForClock(tl(18218149), 100, 130)).toBeNull()
+    // NOT clock 100 — the tl() helper merges historical, which backfills 18218149
+    // to clock 0. Use a verified real mid-match gap instead: [1347, 1552], 205s.
+    expect(tsWindowForClock(tl(18218149), 1400, 1430)).toBeNull()
   })
 
   it('excludes score_adjustment frames, which report Clock 0', () => {
@@ -1258,7 +1286,8 @@ describe('framesInClockWindow', () => {
   })
 
   it('returns an empty array for an uncovered window', () => {
-    expect(framesInClockWindow(tl(18218149), 100, 130)).toEqual([])
+    // Inside the verified 205s gap [1347, 1552] of the MERGED 18218149 timeline.
+    expect(framesInClockWindow(tl(18218149), 1400, 1430)).toEqual([])
   })
 })
 ```
@@ -1274,12 +1303,10 @@ Create `src/timeline/clock.ts`:
 
 ```ts
 import type { Timeline, Frame } from './types.js'
-
-/** score_adjustment reports Clock.Seconds = 0 regardless of when it happens. */
-const CLOCK_EXCLUDED = new Set(['score_adjustment'])
+import { CLOCK_EXCLUDED_ACTIONS } from './types.js'
 
 function usableClockFrames(tl: Timeline): Frame[] {
-  return tl.frames.filter((f) => f.clock !== null && !CLOCK_EXCLUDED.has(f.action))
+  return tl.frames.filter((f) => f.clock !== null && !CLOCK_EXCLUDED_ACTIONS.has(f.action))
 }
 
 /** Frames whose match clock falls inside [clockStart, clockEnd]. */
@@ -1462,8 +1489,8 @@ describe('verify — positive cases', () => {
 
 describe('verify — coverage', () => {
   it('returns UNVERIFIABLE for a window in a feed gap', () => {
-    // 18218149's stream starts at 28:39
-    const r = verify(tl(18218149), claim(18218149, 100, 130, 'goal'))
+    // Verified real 205s gap [1347, 1552] in the merged 18218149 timeline.
+    const r = verify(tl(18218149), claim(18218149, 1400, 1430, 'goal'))
     expect(r.status).toBe('UNVERIFIABLE')
     expect(r.reason).toMatch(/coverage/i)
   })

@@ -449,6 +449,37 @@ not a convenience**, and parsing it means stripping the `data: ` SSE prefix (§8
 Typical frame spacing is ~4.5s, but gaps up to ~220s exist mid-match. **A 30s clip
 window can legitimately contain zero frames.** That is `UNVERIFIABLE`, not a bug.
 
+**Read the table as stream-only.** Once `historical.raw.json` is merged, 18209181
+and 18218149 both cover 0 → end with a max gap of ~205s, the same as the rest. The
+"starts at 19:19 / 28:39" figures describe the live stream alone, which is the
+thing historical exists to repair.
+
+### Ten actions report a meaningless `Clock: 0`
+
+`Clock.Seconds: 0` does **not** mean "at kickoff". These actions carry it:
+
+| Action | n | Real clock 0? |
+|---|---|---|
+| `clock_adjustment` | 16 | **no** — 12 are end-of-stream finalisation boilerplate (`Running: false`) |
+| `score_adjustment` | 3 | **no** — out-of-band correction |
+| `kickoff` | 8 | **yes** — legitimately at clock 0 |
+| `players_on_the_pitch`, `kickoff_team`, `standby`, `status`, `weather`, `pitch`, `players_warming_up`, `jersey`, `action_amend` | 1–4 each | pre-match metadata |
+
+**Exclude `clock_adjustment` and `score_adjustment` from clock lookups and
+coverage** — they report a clock they do not occur at. Do **not** exclude
+`kickoff`; it is real coverage. Excluding only `score_adjustment` collapses every
+fixture's `minClock` to 0 and hides the real start-of-stream gap.
+
+### 18209181's stream contains exact duplicate lines
+
+`scores.ndjson` for 18209181 has **1286 lines but only 873 unique `Seq`** —
+operator retransmission on reconnect. The other five fixtures have none.
+
+The duplicates are **exact**: zero `Seq` values carry differing payloads across the
+whole corpus. So `Seq` is a safe dedupe key, and first-seen-wins drops a
+`Confirmed: true` frame in **zero** cases. Dedupe on merge, or event frame counts
+and any `Seq`-range proof will be wrong for this fixture.
+
 ### Quarter-finals — `FixtureGroupId` 10115675
 
 | FixtureId | Kickoff (UTC) | Fixture | Result | Notable |

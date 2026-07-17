@@ -3,7 +3,7 @@ import { timelineFromCapture } from '../timeline/build.js'
 import { tsWindowForClock } from '../timeline/clock.js'
 import { verify } from '../verify/verifier.js'
 import { impactScore } from '../score/impact.js'
-import { controversyScore, GOAL_WITHDRAWN_SCORE } from '../score/controversy.js'
+import { controversyScore, controversyEvidence, GOAL_WITHDRAWN_SCORE } from '../score/controversy.js'
 import { buildProofCard, proofHash, type ProofCard } from '../proof/card.js'
 import type { ClaimKind } from '../verify/types.js'
 
@@ -46,6 +46,15 @@ export function parseArgs(argv: string[]): CliArgs {
 export interface VerifiedCard extends ProofCard {
   hash: string
   impactEvidence: string
+  /**
+   * What the controversy number was read from, or null when nothing backs it.
+   *
+   * Derived here rather than in the UI for the same reason `impactEvidence` is: a
+   * consumer that re-derives the sentence can drift from the score. Not part of the
+   * ProofCard and therefore not bound into `hash` — it is a restatement of
+   * `matchedEvents`, which is already hashed.
+   */
+  controversyEvidence: string | null
 }
 
 export function runVerify(args: CliArgs): VerifiedCard {
@@ -62,10 +71,18 @@ export function runVerify(args: CliArgs): VerifiedCard {
   const tsWindow = tsWindowForClock(tl, args.clockStart, args.clockEnd)
   const impact = tsWindow ? impactScore(cap.odds, tsWindow[0], tsWindow[1]) : null
 
-  const controversy =
-    args.claimKind === 'goal_withdrawn' && result.status === 'VERIFIED'
-      ? GOAL_WITHDRAWN_SCORE
-      : controversyScore(result.matchedEvents)
+  const withdrawnNoVar = args.claimKind === 'goal_withdrawn' && result.status === 'VERIFIED'
+
+  const controversy = withdrawnNoVar
+    ? GOAL_WITHDRAWN_SCORE
+    : controversyScore(result.matchedEvents)
+
+  // Follows the same branch as the score above. GOAL_WITHDRAWN_SCORE is a constant,
+  // not a table lookup, so controversyEvidence() cannot describe it — say what it
+  // actually is instead of letting the generic path name the wrong event.
+  const controvEvidence = withdrawnNoVar
+    ? 'goal withdrawn · no VAR behind it'
+    : controversyEvidence(result.matchedEvents)
 
   const card = buildProofCard({
     fixtureId: args.fixtureId,
@@ -88,7 +105,12 @@ export function runVerify(args: CliArgs): VerifiedCard {
     },
   })
 
-  return { ...card, hash: proofHash(card), impactEvidence: impact?.evidence ?? 'no odds coverage' }
+  return {
+    ...card,
+    hash: proofHash(card),
+    impactEvidence: impact?.evidence ?? 'no odds coverage',
+    controversyEvidence: controvEvidence,
+  }
 }
 
 function render(c: VerifiedCard): string {

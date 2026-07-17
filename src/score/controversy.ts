@@ -41,5 +41,34 @@ export function controversyScore(matched: MatchedEvent[]): number {
   return max
 }
 
+/**
+ * Names the event the controversy score was actually read from — `var(MistakenIdentity)
+ * + Overturned`, `red_card`, and so on.
+ *
+ * Lives here, next to `scoreOne`, deliberately: it reads the SAME tables the score
+ * reads, so the sentence under the number cannot drift from the number. A score
+ * without its evidence is just an opinion (design-guidelines §3), and a UI-side
+ * reimplementation of this lookup would be an opinion with extra steps.
+ *
+ * Returns null when nothing backs the score — the honest answer for a REJECTED
+ * card with no matched events. The caller must not invent a sentence for it.
+ */
+export function controversyEvidence(matched: MatchedEvent[]): string | null {
+  let best: MatchedEvent | null = null
+  let max = -1
+  for (const e of matched) {
+    const s = scoreOne(e)
+    if (s > max) {
+      max = s
+      best = e
+    }
+  }
+  if (!best || max <= 0) return null
+  if (best.varOutcome) {
+    return `var(${best.varType ?? 'unknown'}) + ${best.varOutcome}`
+  }
+  return `${best.action} · Seq ${best.seq}`
+}
+
 /** Score for a goal withdrawn with no VAR behind it. Weaker than a VAR overturn. */
 export const GOAL_WITHDRAWN_SCORE = 50

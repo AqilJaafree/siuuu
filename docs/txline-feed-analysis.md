@@ -18,7 +18,49 @@ endpoint families *(docs only)*:
 | Fixtures | Upcoming and current fixture metadata |
 | Odds | StablePrice snapshots, historical updates, live stream |
 | Scores | Score snapshots, historical, live event stream |
-| Validation Proofs | Fixture / odds / score proofs for on-chain validation |
+| **Validation Proofs** | **Merkle proofs verifiable on-chain — the differentiator.** See §1.1. |
+
+## 1.1 `validateStat` — the thing that makes this Solana-native
+
+`GET {api}/scores/stat-validation?fixtureId=&seq=&statKey=[&statKey2=]` returns
+Merkle proofs. `program.methods.validateStat(...)` verifies them against the
+`daily_scores_roots` PDA **with no intermediary**. It proves *"at `seq` N, `statKey`
+K satisfied predicate P"* — read-only via `.view()`, needs a raised compute budget
+(`1_400_000`).
+
+```
+[Buffer.from("daily_scores_roots"), epochDay(le,2)]  -> scores roots
+[Buffer.from("daily_batch_roots"),  epochDay(le,2)]  -> odds roots
+[Buffer.from("ten_daily_fixtures_roots"), alignedEpochDay(le,2)] -> fixtures roots
+```
+
+**This changes what SIUUU should anchor.** Hashing our own read of the feed proves
+only that *we* said something. `validateStat` proves the stat itself against roots
+TxODDS already published on Solana. The hackathon brief is explicit that a build
+which only hits REST "has thrown away the Solana-native score."
+
+**But know its limits before designing around it.** The stat keys are goals, cards
+and corners — **there is no `statKey` for a VAR decision.** So:
+
+| Claim | On-chain provable? |
+|---|---|
+| A red card exists at `seq` N | **yes** — `statKey` 5/6 |
+| A goal exists at `seq` N | **yes** — `statKey` 1/2 |
+| The scoreline at `seq` N | **yes** |
+| *VAR overturned this goal* | **no** — no Merkle-backed stat encodes it |
+| *The referee carded the wrong player* | **no** |
+
+SIUUU's controversy thesis lives in `var`/`var_end`, which the Merkle tree does not
+cover. The honest architecture is therefore **two-tier**, and saying so plainly is
+stronger than blurring it:
+
+1. **Merkle-proven** — the stat facts a claim rests on (a red card exists; the score
+   was 1–0), proven on-chain with no intermediary.
+2. **Feed-attested** — the VAR narrative (`Data.Type`, `Data.Outcome`), anchored as
+   a content hash. Trust here is in TxODDS's operator, not in mathematics.
+
+Claiming tier 2 has tier 1's guarantees would be exactly the kind of false statement
+this product exists to refuse.
 
 ### Networks
 
@@ -82,7 +124,7 @@ across all 6 fixtures:
 | `StartTime` | int | epoch ms, kickoff |
 | `IsTeam` | bool | `true` |
 | `Participant1Id` / `Participant2Id` | int | Team ids |
-| `Participant1IsHome` | bool | |
+| `Participant1IsHome` | bool | **A feed mapping, not a venue.** It designates which side is `Participant1`; it does not mean they are at home. The World Cup is played on neutral ground, so `true` here guarantees nothing about location. |
 | `CoverageType` | string | `"TV/Stream"` |
 | `CoverageSecondaryData` | bool | |
 
@@ -334,23 +376,37 @@ not only when — relevant once player-level attribution matters.
 
 ### `StatusId` — match phase
 
-| Id | Meaning | n |
-|---|---|---|
-| 1 | Not started | 20 |
-| 2 | 1st half | 2603 |
-| 3 | Halftime | 38 |
-| 4 | 2nd half | 2797 |
-| 5 | Full time | 12 |
-| 6 | Extra time 1st half | 11 |
-| 7 | (extra time / break) | 342 |
-| 8 | (extra time) | 11 |
-| 9 | (penalties / post-ET) | 350 |
-| 10 | | 6 |
-| 100 | Finalised | 6 |
+**Confirmed against the official soccer feed encoding** (see
+`txline-worldcup-hackathon-SKILL.md` §8). An earlier version of this document
+*inferred* 6–10 from position in the capture and got them wrong — recorded here
+because the corrected values change how knockout fixtures must be read.
 
-Ids 1–5 are confirmed by the capture README. 6–10 and 100 are inferred from
-position and the known extra-time fixtures (18213979, 18222446); confirm against
-the API Reference before relying on them.
+| Id | Code | Meaning | n in capture |
+|---|---|---|---|
+| 1 | NS | Not started | 20 |
+| 2 | H1 | First half in play | 2603 |
+| 3 | HT | Halftime | 38 |
+| 4 | H2 | Second half in play | 2797 |
+| 5 | F | **Ended (finished)** | 12 |
+| 6 | WET | **Waiting for Extra Time** | 11 |
+| 7 | ET1 | **Extra Time first half** | 342 |
+| 8 | HTET | **Extra Time halftime** | 11 |
+| 9 | ET2 | **Extra Time second half** | 350 |
+| 10 | FET | **Ended after Extra Time** | 6 |
+| 11 | WPE | Waiting for Penalty Shootout | 0 |
+| 12 | PE | Penalty Shootout in progress | 0 |
+| 13 | FPE | Ended after Penalty Shootout | 0 |
+| 14–19 | I / A / C / TXCC / TXCS / P | Interrupted, Abandoned, Cancelled, TX Coverage Cancelled/Suspended, Postponed | 0 |
+| **100** | — | **Undocumented.** 6 frames, one per fixture, alongside `game_finalised`. Treat as a terminal marker; do not rely on it. | 6 |
+
+**What the earlier wrong inference cost:** it read 6 as "extra time 1st half" (it is
+*waiting for* extra time — no play), 7 as "a break" (it is ET first half — play),
+and 9 as "penalties" (it is ET second half). A knockout build that trusted that
+would mis-slice exactly the passages where the drama lives.
+
+**Neither extra-time fixture reached penalties** — 18213979 and 18222446 both
+resolved in ET (`FET`, 10). So `WPE`/`PE`/`FPE` (11–13) are **untested by this
+corpus**. The final could go to a shootout; that path has never run.
 
 ### `Stats` — cumulative counters
 
@@ -363,8 +419,23 @@ Base codes:
 | 5 / 6 | team1 / team2 reds |
 | 7 / 8 | team1 / team2 corners |
 
-Period-prefixed: `code = period * 1000 + base`. So `1001` = team1 goals in 1st
-half, `2007` = team1 corners in 2nd half. Periods 1–7 observed.
+Period-prefixed: `code = period * 1000 + base`. Official multipliers:
+
+| Period | Multiplier | Example |
+|---|---|---|
+| H1 | +1000 | `1001` = P1 first-half goals |
+| H2 | +2000 | `2001` = P1 second-half goals |
+| ET1 | +3000 | `3001` = P1 extra-time-1 goals |
+| ET2 | +4000 | `4001` = P1 extra-time-2 goals |
+| **PE** | **+5000** | `5001` = P1 **penalty shootout** goals |
+
+Codes for periods 6 and 7 appear in the capture but are undocumented and always
+zero — ignore them.
+
+**`statKey` is the join to on-chain proof.** `GET /api/scores/stat-validation`
+takes a `statKey` and returns Merkle proofs verifiable against `daily_scores_roots`.
+So `5001`/`5002` are how a penalty shootout gets settled trustlessly — the path
+this corpus never exercises.
 
 **`Stats` and `Score` are redundant.** Prefer `Score` — it is self-describing and
 omits zeros; `Stats` is dense and positional. Use `Stats` only as a cross-check.

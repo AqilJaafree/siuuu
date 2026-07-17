@@ -2374,7 +2374,12 @@ const ACTION_SCORES: Record<string, number> = {
 
 function scoreOne(e: MatchedEvent): number {
   if (e.varOutcome === 'Overturned') {
-    return (e.varType && VAR_OVERTURNED[e.varType]) ?? UNKNOWN_OVERTURNED
+    // Ternary, not `&&`. `&&` returns the falsy operand itself, so a varType of ""
+    // yields "" — and `??` only catches null/undefined, so the empty string would
+    // sail through as the score instead of falling back. VarDecision.type comes off
+    // the wire via a `typeof === 'string'` check, so "" is reachable. Do not
+    // "simplify" this back.
+    return (e.varType ? VAR_OVERTURNED[e.varType] : undefined) ?? UNKNOWN_OVERTURNED
   }
   if (e.varOutcome === 'Stands') return VAR_STANDS
   return ACTION_SCORES[e.action] ?? 0

@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 ._*
 dist/
+
+# 91MB captured corpus — test data, deliberately not in git.
+# Untracked is not enough: one `git add -A` would stage it.
+exact-match-txline-raw/

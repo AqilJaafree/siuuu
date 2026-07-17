@@ -103,11 +103,44 @@ function varSubjectInClip(tl: Timeline, claim: Claim, d: VarDecision): EventStat
       (e) =>
         e.discarded === mustBeDiscarded &&
         e.clock !== null &&
-        Math.abs(e.clock - (d.clockStart as number)) <= VAR_CONTEXT_SEC,
+        Math.abs(e.clock - (d.clockStart as number)) <= VAR_CONTEXT_SEC &&
+        causallyOrdered(e, d, mustBeDiscarded),
     )
     if (found) return found
   }
   return null
+}
+
+/**
+ * A review cannot have caused a discard that already happened.
+ *
+ * The operator discards the event BECAUSE the review overturned it, so the
+ * `action_discarded` must FOLLOW the `var_end` in Seq order. Holds 4/4 corpus-wide
+ * with no exceptions:
+ *
+ *   18237038  var_end Seq 641 -> discard Seq 642   (Id 571 -> 570)
+ *   18213979  var_end Seq 538 -> discard Seq 539   (Id 492 -> 490)
+ *   18213979  var_end Seq 940 -> discard Seq 941   (Id 843 -> 842)
+ *   18222446  var_end Seq 683 -> discard Seq 684/685
+ *
+ * This is causal, not pattern-matched — which is why it generalises where `Id`
+ * adjacency does not (571/570 are adjacent but 492/490 are off by two, an artifact
+ * of these six fixtures).
+ *
+ * Its value is being ORTHOGONAL to the temporal tie. 18213979's goal Id 410 @2935
+ * is otherwise excluded from VAR 492 @3315 solely because 380s > VAR_CONTEXT_SEC —
+ * one constant between us and a false claim. Here it is rejected a second way: the
+ * discard landed ~100 frames BEFORE the review opened, so the review cannot have
+ * caused it.
+ *
+ * Only applies to the Overturned path. A `Stands` review discards nothing (18209181
+ * penalty Id 296 has no discard at all), so there is no ordering to check.
+ */
+function causallyOrdered(e: EventState, d: VarDecision, mustBeDiscarded: boolean): boolean {
+  if (!mustBeDiscarded) return true
+  const discard = e.frames.find((f) => f.action === 'action_discarded')
+  if (!discard) return false
+  return discard.seq > d.seqEnd
 }
 
 /**

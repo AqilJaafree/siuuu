@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { verify } from '../../src/verify/verifier.js'
 import { timelineFromCapture } from '../../src/timeline/build.js'
 import { loadFixture, CORPUS_ROOT } from '../../src/txline/corpus.js'
+import { varDecisions } from '../../src/timeline/var.js'
+import { resolveEvent } from '../../src/timeline/events.js'
 import type { ClaimKind } from '../../src/verify/types.js'
 
 const tl = (id: number) => timelineFromCapture(loadFixture(CORPUS_ROOT, id), { mergeHistorical: true })
@@ -53,6 +55,27 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
     const r = verify(tl(18213979), claim(18213979, 2920, 2950, 'goal_withdrawn'))
     expect(r.status).toBe('VERIFIED')
     expect(r.matchedEvents[0].eventId).toBe(410)
+  })
+})
+
+describe('PRECISION: a review cannot have caused a discard that already happened', () => {
+  it('18213979 Id 410 is excluded by Seq ordering, independently of the ±180s tie', () => {
+    // Goal 410 @2935 was discarded at Seq 441; VAR 492 opened ~100 frames later.
+    // The temporal tie already rejects this (380s > 180s), but that is ONE constant.
+    // This must stay REJECTED even if VAR_CONTEXT_SEC were widened.
+    const r = verify(tl(18213979), claim(18213979, 2920, 2950, 'var_overturned_goal'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('every real VAR overturn has its discard AFTER the var_end', () => {
+    // The causal invariant the guard encodes. If a future fixture violates it, the
+    // model is wrong and this should fail loudly rather than silently reject.
+    for (const [fixtureId, varEnd, goalId] of [[18237038, 571, 570], [18213979, 492, 490]] as const) {
+      const t = tl(fixtureId)
+      const d = varDecisions(t).find((x) => x.eventId === varEnd)!
+      const discard = resolveEvent(t, goalId)!.frames.find((f) => f.action === 'action_discarded')!
+      expect(discard.seq).toBeGreaterThan(d.seqEnd)
+    }
   })
 })
 

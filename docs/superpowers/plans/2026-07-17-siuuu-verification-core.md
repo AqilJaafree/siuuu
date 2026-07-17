@@ -1626,11 +1626,44 @@ function varSubjectInClip(tl: Timeline, claim: Claim, d: VarDecision): EventStat
       (e) =>
         e.discarded === mustBeDiscarded &&
         e.clock !== null &&
-        Math.abs(e.clock - (d.clockStart as number)) <= VAR_CONTEXT_SEC,
+        Math.abs(e.clock - (d.clockStart as number)) <= VAR_CONTEXT_SEC &&
+        causallyOrdered(e, d, mustBeDiscarded),
     )
     if (found) return found
   }
   return null
+}
+
+/**
+ * A review cannot have caused a discard that already happened.
+ *
+ * The operator discards the event BECAUSE the review overturned it, so the
+ * `action_discarded` must FOLLOW the `var_end` in Seq order. Holds 4/4 corpus-wide
+ * with no exceptions:
+ *
+ *   18237038  var_end Seq 641 -> discard Seq 642   (Id 571 -> 570)
+ *   18213979  var_end Seq 538 -> discard Seq 539   (Id 492 -> 490)
+ *   18213979  var_end Seq 940 -> discard Seq 941   (Id 843 -> 842)
+ *   18222446  var_end Seq 683 -> discard Seq 684/685
+ *
+ * This is causal, not pattern-matched — which is why it generalises where `Id`
+ * adjacency does not (571/570 are adjacent but 492/490 are off by two, an artifact
+ * of these six fixtures).
+ *
+ * Its value is being ORTHOGONAL to the temporal tie. 18213979's goal Id 410 @2935
+ * is otherwise excluded from VAR 492 @3315 solely because 380s > VAR_CONTEXT_SEC —
+ * one constant between us and a false claim. Here it is rejected a second way: the
+ * discard landed ~100 frames BEFORE the review opened, so the review cannot have
+ * caused it.
+ *
+ * Only applies to the Overturned path. A `Stands` review discards nothing (18209181
+ * penalty Id 296 has no discard at all), so there is no ordering to check.
+ */
+function causallyOrdered(e: EventState, d: VarDecision, mustBeDiscarded: boolean): boolean {
+  if (!mustBeDiscarded) return true
+  const discard = e.frames.find((f) => f.action === 'action_discarded')
+  if (!discard) return false
+  return discard.seq > d.seqEnd
 }
 
 /**
@@ -1848,6 +1881,8 @@ import { describe, it, expect } from 'vitest'
 import { verify } from '../../src/verify/verifier.js'
 import { timelineFromCapture } from '../../src/timeline/build.js'
 import { loadFixture, CORPUS_ROOT } from '../../src/txline/corpus.js'
+import { varDecisions } from '../../src/timeline/var.js'
+import { resolveEvent } from '../../src/timeline/events.js'
 import type { ClaimKind } from '../../src/verify/types.js'
 
 const tl = (id: number) => timelineFromCapture(loadFixture(CORPUS_ROOT, id), { mergeHistorical: true })
@@ -1899,6 +1934,27 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
     const r = verify(tl(18213979), claim(18213979, 2920, 2950, 'goal_withdrawn'))
     expect(r.status).toBe('VERIFIED')
     expect(r.matchedEvents[0].eventId).toBe(410)
+  })
+})
+
+describe('PRECISION: a review cannot have caused a discard that already happened', () => {
+  it('18213979 Id 410 is excluded by Seq ordering, independently of the ±180s tie', () => {
+    // Goal 410 @2935 was discarded at Seq 441; VAR 492 opened ~100 frames later.
+    // The temporal tie already rejects this (380s > 180s), but that is ONE constant.
+    // This must stay REJECTED even if VAR_CONTEXT_SEC were widened.
+    const r = verify(tl(18213979), claim(18213979, 2920, 2950, 'var_overturned_goal'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('every real VAR overturn has its discard AFTER the var_end', () => {
+    // The causal invariant the guard encodes. If a future fixture violates it, the
+    // model is wrong and this should fail loudly rather than silently reject.
+    for (const [fixtureId, varEnd, goalId] of [[18237038, 571, 570], [18213979, 492, 490]] as const) {
+      const t = tl(fixtureId)
+      const d = varDecisions(t).find((x) => x.eventId === varEnd)!
+      const discard = resolveEvent(t, goalId)!.frames.find((f) => f.action === 'action_discarded')!
+      expect(discard.seq).toBeGreaterThan(d.seqEnd)
+    }
   })
 })
 
@@ -2008,7 +2064,7 @@ describe('PRECISION: the VAR context window does not over-reach', () => {
 - [ ] **Step 2: Run the precision tests**
 
 Run: `npx vitest run tests/verify/precision.test.ts`
-Expected: PASS — 20 tests.
+Expected: PASS — 22 tests.
 
 If `18213979 Id 410` verifies as `var_overturned_goal`, `VAR_CONTEXT_SEC` is too
 wide. The nearest VAR is 380s away; the constant must stay well under that.

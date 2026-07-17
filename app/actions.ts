@@ -29,7 +29,10 @@ export interface VerifyResponse {
  * has no backing event, step 3 lands REJECTED and says so. The pipeline is not a
  * progress bar with a foregone conclusion.
  */
-export async function verifyCase(id: string): Promise<VerifyResponse | { error: string }> {
+export async function verifyCase(
+  id: string,
+  sponsor: string | null = null,
+): Promise<VerifyResponse | { error: string }> {
   const spec = findCase(id)
   if (!spec) return { error: `No such demo case: ${id}` }
 
@@ -38,6 +41,9 @@ export async function verifyCase(id: string): Promise<VerifyResponse | { error: 
     clockStart: spec.clockStart,
     clockEnd: spec.clockEnd,
     claimKind: spec.claimKind,
+    // Goes into the canonical card and therefore into the hash. If the claim is
+    // refused, `buildProofCard` drops it — no brand rides on an unbacked claim.
+    sponsor,
   })
 
   const matched = card.matchedEvents.length
@@ -78,11 +84,17 @@ export async function verifyCase(id: string): Promise<VerifyResponse | { error: 
       detail: `sha256 ${card.hash.slice(0, 12)}…`,
     },
     {
-      // Never "Publishing" and never "Anchored" — nothing is submitted on-chain.
+      // Never "Publishing" and never "Anchored". A MERKLE_PROVEN card was proven by a
+      // validateStat call that RAN against devnet — at precompute time, because a
+      // Netlify box has no keypair and no credentials. A FEED_ATTESTED card had no
+      // such call and says so. The detail states which of those actually happened.
       n: '6',
       name: 'State the tier',
       state: 'DONE',
-      detail: `${card.validation.tier} · ${card.validation.network}`,
+      detail:
+        card.validation.tier === 'MERKLE_PROVEN'
+          ? `MERKLE_PROVEN · statKey ${card.validation.statKey} · seq ${card.validation.seq} · ${card.validation.network}`
+          : `FEED_ATTESTED · ${card.validation.network} · no validateStat call for this claim`,
     },
   ]
 

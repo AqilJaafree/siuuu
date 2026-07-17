@@ -75,6 +75,10 @@ function ProofBody({
 }) {
   const { card } = clip
   const tier = TIER_COPY[card.validation.tier]
+  // Both conditions, deliberately. The tier alone is a label; `verifiedOnChain` is the
+  // record that a call actually returned true. Rendering the strong branch on the
+  // label alone would let a mislabelled card show proof coordinates it never earned.
+  const proven = card.validation.tier === 'MERKLE_PROVEN' && card.validation.verifiedOnChain === true
 
   return (
     <div className="col" style={{ padding: 18, gap: 14 }}>
@@ -215,12 +219,26 @@ function ProofBody({
         </div>
       </div>
 
-      {/* Proof tier. MERKLE_PROVEN and FEED_ATTESTED must never blur into each other. */}
+      {/* Proof tier. MERKLE_PROVEN and FEED_ATTESTED must never blur into each other.
+          A proven card shows the coordinates anyone can re-check — statKey, seq, and
+          the roots PDA it terminated at. An attested card shows none of that, because
+          none of it exists, and says plainly that no proof ran. The two blocks are
+          deliberately different shapes: same badge in different colours would invite
+          exactly the skim-read that makes "attested" feel like "proven". */}
       <div className="col" style={{ gap: 6 }}>
         <span className="lbl" style={{ opacity: 0.5 }}>
           WHAT BACKS THIS
         </span>
-        <div className="col" style={{ border: '3px solid var(--ink)', padding: 10, gap: 8 }}>
+        <div
+          className="col"
+          style={{
+            border: '3px solid var(--ink)',
+            // The proven card is the only thing in this sheet that earns a hard shadow.
+            boxShadow: proven ? '4px 4px 0 var(--verified)' : 'none',
+            padding: 10,
+            gap: 8,
+          }}
+        >
           <div className="row" style={{ alignItems: 'center', gap: 8 }}>
             <span
               className="pill"
@@ -233,21 +251,57 @@ function ProofBody({
             </span>
           </div>
           <span style={{ fontSize: 11, lineHeight: 1.45 }}>{tier.rests}</span>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <span className="mono" style={{ fontSize: 9, opacity: 0.7 }}>
-              statKey{' '}
-              {card.validation.statKey ?? 'none — no Merkle-backed stat exists for this claim'}
-            </span>
-            <span className="mono" style={{ fontSize: 9, opacity: 0.7 }}>
-              seq {card.validation.seq}
-            </span>
-          </div>
-          {/* Never say "anchored" when nothing was anchored. */}
-          {!card.validation.verifiedOnChain && (
-            <span className="mono" style={{ fontSize: 9, opacity: 0.7, lineHeight: 1.4 }}>
-              Not submitted on-chain: no validateStat call ran for this card.
-            </span>
+
+          {proven ? (
+            <>
+              {/* Facts, in mono, because they are coordinates and not prose. Anyone can
+                  take these three and re-run validateStat themselves. */}
+              <div className="sunk col" style={{ padding: '8px 10px', gap: 5 }}>
+                <Coord label="statKey" value={String(card.validation.statKey)} />
+                <Coord label="seq" value={String(card.validation.seq)} />
+                <Coord label="roots PDA" value={card.validation.rootsPda ?? '—'} wrap />
+              </div>
+              <span className="mono" style={{ fontSize: 9, opacity: 0.7, lineHeight: 1.4 }}>
+                validateStat returned true against daily_scores_roots. Run at build time — a
+                deploy box has no keypair — against the same chain you can check it on.
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <span className="mono" style={{ fontSize: 9, opacity: 0.7 }}>
+                  statKey none — no Merkle-backed stat exists for this claim
+                </span>
+                <span className="mono" style={{ fontSize: 9, opacity: 0.7 }}>
+                  seq {card.validation.seq}
+                </span>
+              </div>
+              {/* Never say "anchored" when nothing was anchored. */}
+              <span className="mono" style={{ fontSize: 9, opacity: 0.7, lineHeight: 1.4 }}>
+                Not submitted on-chain: no validateStat call ran for this card.
+              </span>
+            </>
           )}
+        </div>
+      </div>
+
+      {/* The sponsor. Inside the hash, so it is evidence, not decoration — and there is
+          nothing to show on a refused claim, because a refused claim carries no brand. */}
+      <div className="col" style={{ gap: 6 }}>
+        <span className="lbl" style={{ color: 'var(--sponsor)' }}>
+          SPONSOR ON THIS CLAIM
+        </span>
+        <div className="sunk col" style={{ padding: '9px 10px', gap: 4 }}>
+          <span className="mono" style={{ fontSize: 11, fontWeight: 700 }}>
+            {card.sponsor ?? 'none'}
+          </span>
+          <span className="mono" style={{ fontSize: 9, opacity: 0.65, lineHeight: 1.4 }}>
+            {card.status === 'REJECTED'
+              ? 'The claim was refused, so no sponsor rides on it. A logo cannot appear on a clip that isn’t true.'
+              : card.sponsor
+                ? 'Committed inside the hash above. Swap the sponsor and the hash changes — the swap is detectable.'
+                : 'No campaign attached to this claim.'}
+          </span>
         </div>
       </div>
 
@@ -283,6 +337,31 @@ function ProofBody({
           Deterministic over the canonical card. Same card → same bytes → same hash.
         </span>
       </div>
+    </div>
+  )
+}
+
+/** One re-checkable coordinate. Mono, label left, value right — a table, not a sentence. */
+function Coord({ label, value, wrap }: { label: string; value: string; wrap?: boolean }) {
+  return (
+    <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
+      <span className="mono" style={{ fontSize: 9, opacity: 0.55, width: 62, flex: 'none' }}>
+        {label}
+      </span>
+      <span
+        className="mono"
+        title={value}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: 10,
+          fontWeight: 700,
+          wordBreak: wrap ? 'break-all' : 'normal',
+          lineHeight: 1.35,
+        }}
+      >
+        {value}
+      </span>
     </div>
   )
 }

@@ -47,6 +47,22 @@ const CASES: DemoCase[] = [
     fixtureLabel: 'Argentina vs Brazil · QF',
   },
   {
+    // The same 30 seconds of football as `c-mistaken`, and the whole two-tier story.
+    // The RED CARD is a stat in TxODDS's Merkle tree, so it proves against Solana
+    // outright — statKey 6, seq 687, verified live. The VAR REASON sitting next to it
+    // is not a stat and never can be, so it stays the operator's word. Two strengths
+    // of evidence from one moment, shown as two different things rather than blurred
+    // into one badge.
+    id: 'c-redcard',
+    fixtureId: 18222446,
+    clockStart: 4265,
+    clockEnd: 4295,
+    claimKind: 'red_card',
+    title: 'The red card itself — proven on Solana',
+    blurb: 'The card is a stat in the tree, so mathematics backs it. Why it was shown is only the feed’s word.',
+    fixtureLabel: 'Argentina vs Brazil · QF',
+  },
+  {
     id: 'c-overturned',
     fixtureId: 18237038,
     clockStart: 3625,

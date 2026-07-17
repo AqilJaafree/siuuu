@@ -54,7 +54,9 @@ export function ClipScreen({
     // The real engine runs first. The stepping below reveals a pipeline that has
     // already genuinely completed — it never animates ahead of the result and then
     // backfills it.
-    const res = await verifyCase(claimId)
+    // The sponsor travels with the claim: it is part of the canonical card and lands
+    // inside the proof hash, so the card commits to which brand rides on it.
+    const res = await verifyCase(claimId, sponsor)
     if ('error' in res) {
       setError(res.error)
       setVerifying(false)
@@ -189,8 +191,12 @@ export function ClipScreen({
                   </button>
                 ))}
               </div>
+              {/* The choice is now bound into the hash, which is a real and checkable
+                  claim. The escrow still does not exist, and saying otherwise here
+                  would be the overclaim — so state exactly which half is true. */}
               <span className="mono" style={{ fontSize: 9, opacity: 0.6, lineHeight: 1.4 }}>
-                No escrow is committed. Campaign selection is not wired to a contract yet.
+                Goes inside the proof hash — swap it and the hash changes. A refused claim
+                carries no sponsor. No escrow is committed; no money moves yet.
               </span>
             </div>
 

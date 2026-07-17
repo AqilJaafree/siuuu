@@ -1593,6 +1593,94 @@ function eventsWithAction(tl: Timeline, claim: Claim, action: string): EventStat
   )
 }
 
+/**
+ * What each review type acts on. A review always has a subject; naming it is the
+ * difference between evidence and a coincidence of timing.
+ */
+const VAR_SUBJECT_ACTIONS: Record<string, string[]> = {
+  Goal: ['goal'],
+  Penalty: ['penalty'],
+  MistakenIdentity: ['yellow_card', 'red_card'],
+}
+
+/** Does the review itself fall inside the clip? Then the clip shows the review. */
+function varOverlapsClip(d: VarDecision, claim: Claim): boolean {
+  if (d.clockStart === null || d.clockEnd === null) return false
+  return overlaps(d.clockStart, d.clockEnd, claim.clockStart, claim.clockEnd)
+}
+
+/**
+ * The event the review acted on, if it sits in the clip AND is tied to the review.
+ *
+ * An `Overturned` review kills its subject (the subject is discarded); a `Stands`
+ * review leaves it standing (not discarded). Both directions matter.
+ */
+function varSubjectInClip(tl: Timeline, claim: Claim, d: VarDecision): EventState | null {
+  if (d.clockStart === null || d.type === null) return null
+  const actions = VAR_SUBJECT_ACTIONS[d.type]
+  if (!actions) return null // unknown review type — never invent a subject for it
+  const mustBeDiscarded = d.outcome === 'Overturned'
+
+  for (const action of actions) {
+    const found = eventsWithAction(tl, claim, action).find(
+      (e) =>
+        e.discarded === mustBeDiscarded &&
+        e.clock !== null &&
+        Math.abs(e.clock - (d.clockStart as number)) <= VAR_CONTEXT_SEC,
+    )
+    if (found) return found
+  }
+  return null
+}
+
+/**
+ * Shared resolver for every VAR-backed claim.
+ *
+ * A VAR pair within ±180s is NOT sufficient on its own — the review may concern a
+ * different incident entirely. Two corpus cases prove it:
+ *
+ *   18237038: goal Id 551 @3455 STOOD (confirmed, never discarded — one of Spain's
+ *   two). VAR Id 571 @3641 overturned a DIFFERENT goal, Id 570 @3629. A bare-pair
+ *   match publishes a clip of Spain's legitimate goal as "VAR overturned it".
+ *
+ *   18222446: goal Id 595 @4010 STOOD. The MistakenIdentity VAR Id 611 @4180 is
+ *   170s later and concerns a card, not that goal. A bare-pair match publishes a
+ *   clip of a goal that counted as "VAR found mistaken identity".
+ *
+ * So the claim holds only if the clip shows the review, OR shows the subject the
+ * review acted on. Tie temporally, NOT by `Id` adjacency — 570/571 are adjacent
+ * but 490/492 are not, so adjacency does not generalise.
+ */
+function verifyVarClaim(
+  tl: Timeline,
+  claim: Claim,
+  predicate: (d: VarDecision) => boolean,
+  notFoundReason: string,
+): VerifyResult {
+  const d = varInContext(tl, claim, predicate)
+  if (!d) return no(`${notFoundReason} ${describeWindow(tl, claim)}`)
+
+  const describe = `VAR reviewed a ${d.type ?? 'decision'} and ${
+    d.outcome === 'Stands' ? 'it Stands' : `${d.outcome ?? 'resolved'} it`
+  }, at clock ${d.clockStart}-${d.clockEnd}.`
+
+  const subject = varSubjectInClip(tl, claim, d)
+
+  // The clip shows the review itself — the claim is about the review.
+  if (varOverlapsClip(d, claim)) {
+    return ok(describe, subject ? [varMatch(d), eventMatch(subject)] : [varMatch(d)])
+  }
+
+  // The clip does not show the review, so it must show what the review acted on.
+  if (subject) return ok(describe, [varMatch(d), eventMatch(subject)])
+
+  return no(
+    `A VAR ${d.type ?? '?'}/${d.outcome ?? '?'} decision exists at clock ${d.clockStart}, but this ` +
+      `clip contains neither the review nor the event it acted on — it may concern a different ` +
+      `incident. ${describeWindow(tl, claim)}`,
+  )
+}
+
 function ok(reason: string, matched: MatchedEvent[]): VerifyResult {
   const seqs = matched.map((m) => m.seq)
   return {
@@ -1651,64 +1739,18 @@ export function verify(tl: Timeline, claim: Claim): VerifyResult {
   }
 
   const handlers: Record<ClaimKind, () => VerifyResult> = {
-    var_overturned_goal: () => {
-      // Both directions must hold. Either alone states something false.
-      const d = varInContext(tl, claim, (x) => x.type === 'Goal' && x.outcome === 'Overturned')
-      if (!d) {
-        return no(
-          `No VAR decision of type Goal with outcome Overturned within ${VAR_CONTEXT_SEC}s. ` +
-            `A discarded goal alone does not prove VAR. ${describeWindow(tl, claim)}`,
-        )
-      }
+    var_overturned_goal: () => verifyVarClaim(tl, claim, (d) => d.type === 'Goal' && d.outcome === 'Overturned',
+      `No VAR decision of type Goal with outcome Overturned within ${VAR_CONTEXT_SEC}s. ` +
+        `A discarded goal alone does not prove VAR.`),
 
-      // A VAR pair alone is NOT enough — it may have overturned a DIFFERENT goal.
-      // 18237038 holds both: Id 551 @3455 is Confirmed and STOOD (one of Spain's
-      // two goals), while Id 570 @3629 is the goal VAR killed, 186s later. With
-      // the VAR pair as sole evidence, a clip of the goal that STOOD verifies as
-      // "VAR overturned this goal" — telling the world a legitimate goal was
-      // disallowed. Require a discarded goal in the window AND tie it temporally
-      // to the review.
-      const goal = eventsWithAction(tl, claim, 'goal').find(
-        (e) =>
-          e.discarded &&
-          e.clock !== null &&
-          d.clockStart !== null &&
-          Math.abs(e.clock - d.clockStart) <= VAR_CONTEXT_SEC,
-      )
-      if (!goal) {
-        return no(
-          `A VAR Goal/Overturned decision exists at clock ${d.clockStart}, but no discarded ` +
-            `goal in this window is tied to it — the review may have overturned a different ` +
-            `goal. ${describeWindow(tl, claim)}`,
-        )
-      }
+    var_overturned_penalty: () => verifyVarClaim(tl, claim, (d) => d.type === 'Penalty' && d.outcome === 'Overturned',
+      `No VAR decision of type Penalty with outcome Overturned within ${VAR_CONTEXT_SEC}s.`),
 
-      return ok(
-        `VAR reviewed a Goal and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`,
-        [varMatch(d), eventMatch(goal)],
-      )
-    },
+    mistaken_identity: () => verifyVarClaim(tl, claim, (d) => d.type === 'MistakenIdentity' && d.outcome === 'Overturned',
+      `No VAR decision of type MistakenIdentity within ${VAR_CONTEXT_SEC}s.`),
 
-    var_overturned_penalty: () => {
-      const d = varInContext(tl, claim, (x) => x.type === 'Penalty' && x.outcome === 'Overturned')
-      return d
-        ? ok(`VAR reviewed a Penalty and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`, [varMatch(d)])
-        : no(`No VAR decision of type Penalty with outcome Overturned within ${VAR_CONTEXT_SEC}s. ${describeWindow(tl, claim)}`)
-    },
-
-    mistaken_identity: () => {
-      const d = varInContext(tl, claim, (x) => x.type === 'MistakenIdentity' && x.outcome === 'Overturned')
-      return d
-        ? ok(`VAR found mistaken identity and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`, [varMatch(d)])
-        : no(`No VAR decision of type MistakenIdentity within ${VAR_CONTEXT_SEC}s. ${describeWindow(tl, claim)}`)
-    },
-
-    var_stands: () => {
-      const d = varInContext(tl, claim, (x) => x.outcome === 'Stands')
-      return d
-        ? ok(`VAR reviewed a ${d.type ?? 'decision'} and it Stands, at clock ${d.clockStart}-${d.clockEnd}.`, [varMatch(d)])
-        : no(`No VAR decision with outcome Stands within ${VAR_CONTEXT_SEC}s. ${describeWindow(tl, claim)}`)
-    },
+    var_stands: () => verifyVarClaim(tl, claim, (d) => d.outcome === 'Stands',
+      `No VAR decision with outcome Stands within ${VAR_CONTEXT_SEC}s.`),
 
     goal_withdrawn: () => {
       const e = eventsWithAction(tl, claim, 'goal').find((x) => x.discarded)
@@ -1860,6 +1902,48 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
   })
 })
 
+describe('PRECISION: a bare VAR pair proves nothing — EVERY handler', () => {
+  // The bug class, not the bug. It was first found in var_overturned_goal; review
+  // then found the identical hole in mistaken_identity and var_overturned_penalty.
+  // One test per handler, each using the "clip with no subject in it" shape.
+
+  it('mistaken_identity: a clip of the goal that STOOD (18222446 Id 595 @4010)', () => {
+    // The MistakenIdentity VAR at 4180 is 170s later and concerns a CARD, not this
+    // goal. Without a subject tie, this clip publishes a goal that counted as
+    // "VAR found mistaken identity and overturned it".
+    const r = verify(tl(18222446), claim(18222446, 4000, 4030, 'mistaken_identity'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).toMatch(/different incident/i)
+  })
+
+  it('mistaken_identity: that same clip DOES verify as a clean confirmed goal', () => {
+    const r = verify(tl(18222446), claim(18222446, 4000, 4030, 'goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].eventId).toBe(595)
+  })
+
+  it('var_overturned_penalty: a clip containing no penalty at all (18213979 @6110)', () => {
+    // 40s after the review closed. Penalty Id 842 @5929 is far outside the window.
+    const r = verify(tl(18213979), claim(18213979, 6110, 6140, 'var_overturned_penalty'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('var_stands: a clip long after the reviewed penalty resolved (18209181 @1700)', () => {
+    // VAR 300 @1550-1582 does not overlap, and penalty 296 @1472 is not in the clip.
+    const r = verify(tl(18209181), claim(18209181, 1700, 1730, 'var_stands'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('a Stands review still verifies when the clip SHOWS the review', () => {
+    // The subject (penalty 296 @1472) sits 78s BEFORE this clip and is never
+    // discarded — a review that stands kills nothing. Requiring a discarded
+    // subject in-clip would wrongly reject this. The clip shows the review itself.
+    const r = verify(tl(18209181), claim(18209181, 1540, 1590, 'var_stands'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].varOutcome).toBe('Stands')
+  })
+})
+
 describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', () => {
   // The mirror of the discard-without-VAR trap, and just as fatal.
   // 18237038 holds a goal that STOOD (Id 551 @3455, Confirmed, never discarded)
@@ -1924,7 +2008,7 @@ describe('PRECISION: the VAR context window does not over-reach', () => {
 - [ ] **Step 2: Run the precision tests**
 
 Run: `npx vitest run tests/verify/precision.test.ts`
-Expected: PASS — 15 tests.
+Expected: PASS — 20 tests.
 
 If `18213979 Id 410` verifies as `var_overturned_goal`, `VAR_CONTEXT_SEC` is too
 wide. The nearest VAR is 380s away; the constant must stay well under that.

@@ -1,25 +1,25 @@
 # Netlify deploy config for SIUUU.
 #
-# THE THING THAT WILL BREAK IF YOU CHANGE THIS
+# WHY `precompute` IS NOT IN THE BUILD COMMAND
 #
-# The app verifies against `exact-match-txline-raw/` — a 91MB capture that is
-# gitignored and therefore NOT in this repo, NOT in the Netlify build, and NOT on
-# any deploy target. `loadFixture` does readFileSync on it. Without the precompute
-# step below, the site builds green and then throws ENOENT on every card: broken in
-# the worst possible way, because it looks fine until a judge taps something.
+# It cannot run here. `npm run precompute` reads `exact-match-txline-raw/` — a 91MB
+# capture that is gitignored and therefore NOT in this repo and NOT on this build
+# box — and `--prove` additionally needs a funded devnet keypair and live TxODDS
+# credentials. A build box has none of those. Putting it in the build command fails
+# the deploy outright.
 #
-# `precompute` runs the real verifier against the real corpus on YOUR machine (or
-# any box that has it) and writes src/generated/demo-proofs.json. That is not a
-# mock: the verifier and both scorers are pure, and proofHash is canonical, so a
-# card computed at build time is byte-identical to one computed per-request. It
-# also fails the build if the REJECTED case ever disappears — a feed that only says
-# yes is not this product.
+# So precompute runs LOCALLY, on a machine that has the corpus, and its output —
+# src/generated/demo-proofs.json and src/generated/proven-stats.ts — is COMMITTED.
+# Those two files are the deployed site's only data source: nothing here calls the
+# verifier at request time, because doing so is how the homepage came to 500.
 #
-# So: commit src/generated/demo-proofs.json. It is build output, but it is the only
-# way the deployed site has anything true to show.
+# Re-running it requires a box with the corpus (and, for --prove, devnet creds). If
+# you do not have the corpus, you cannot regenerate these files — and you must not
+# hand-edit them, because every number and hash in them was computed by the real
+# engine and every MERKLE_PROVEN tier was a validateStat call that actually ran.
 
 [build]
-  command = "npm run precompute && npm run build"
+  command = "npm run build"
   publish = ".next"
 
 [build.environment]

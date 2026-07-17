@@ -9,6 +9,21 @@
  * this step the site builds green and then throws ENOENT on every card — broken in
  * the worst way, because it looks fine until someone taps something.
  *
+ * THE GENERATED FILES ARE THE APP'S ONLY DATA SOURCE
+ *
+ * src/generated/demo-proofs.json and src/generated/proven-stats.ts are what the
+ * deployed site renders. Nothing in app/ calls `runVerify` any more, and there is
+ * deliberately no fallback that recomputes when they look wrong — one source, always.
+ *
+ * So a stale regenerate is a real risk, not a cosmetic one: whatever this script last
+ * wrote IS the feed, hashes and tiers included. If you change the DEMOS below, change
+ * a scorer, or change the card shape, this must be re-run on a box with the corpus
+ * and the result committed — otherwise the site keeps serving the old cards while the
+ * code claims to produce new ones, and no test will catch the divergence. Equally, the
+ * five cases here must stay in step with app/lib/feed.ts: a case the app asks for and
+ * this script never computed throws at build time (`cardFor`), which is the intended
+ * failure — loud, not silent.
+ *
  * WHY IT IS NOT A CHEAT
  *
  * The verifier and both scorers are PURE functions over an in-memory timeline, and

@@ -37,14 +37,20 @@ TXLine (TxODDS) publishes a Solana-anchored live feed for the World Cup. Analysi
 of the devnet capture (see companion doc) surfaced two things that make this
 buildable:
 
-**TXLine is a referee-decision audit trail.** Its action taxonomy includes `var`,
-`var_end`, `action_discarded`, `action_amend`, `score_adjustment`, and
-`unreliable_yellow_cards`. Every event arrives twice — `Confirmed: false` then
-`Confirmed: true` — sharing a stable `Id`. The feed records the exact second a
-goal was given and the exact second it was taken away. **Controversy is a
-first-class data type in the source of record.** The Egypt–Argentina case is not
-something we infer from commentary; it is `action_discarded` at a known clock
-value.
+**TXLine is a referee-decision audit trail.** `var` / `var_end` pairs carry an
+explicit, structured decision:
+
+```
+Data.Type    ∈ { Goal, Penalty, MistakenIdentity }
+Data.Outcome ∈ { Overturned, Stands }
+```
+
+**Controversy is a literal enum value in the source of record.** "The referee
+carded the wrong player and VAR corrected it" is not something to infer from
+commentary — it is `Data.Type: "MistakenIdentity"`, `Data.Outcome: "Overturned"`,
+at a known second. Every event arrives twice (`Confirmed: false` → `true`) sharing
+a stable `Id`, so the feed records exactly when a decision was made and when it
+was reversed.
 
 **The odds feed is a drama oracle.** Around a confirmed goal the market suspends
 (empty `Prices` — 2,979 of 208,504 messages in the capture) and then reprices
@@ -55,6 +61,29 @@ significance in seconds, objectively, and a clipper cannot fake it.
 So: **the clock is the join key.** Broadcast overlays burn the match clock and
 scoreline into the video. TXLine knows the full state at every `Clock.Seconds`.
 That is the bridge.
+
+### And the timing is absurd
+
+The capture is not test data. It is the **real 2026 World Cup quarter-finals and
+semi-finals**, played 9–15 July 2026 — last week. The bracket resolves to
+**Spain v Argentina, 19 July, MetLife**. Two days out.
+
+**The capture is both finalists' complete road to the final**, and it contains
+the thesis outright — five confirmed VAR decisions, four of them overturns:
+
+- **A goal overturned by VAR in France 0–2 Spain** (`Id` 571, clock 3641→3653) —
+  in the semi-final France lost. Spain plays the final.
+- **`MistakenIdentity` / `Overturned` in Argentina's quarter-final** (`Id` 611,
+  clock 4180→4272), **immediately followed by the corpus's only red card**
+  (`Id` 613, clock 4280). The referee carded the wrong player, VAR caught it, the
+  right player went off. Argentina plays the final.
+- A goal and a penalty both overturned in England's quarter-final.
+- The one decision that *stands*: `Penalty`/`Stands` in France–Morocco — the
+  negative case, which matters as much as the overturns.
+
+So SIUUU does not demo on synthetic data and hope for a good moment. It verifies
+the actual referee controversies from both finalists' road to a final that is two
+days away — and then runs live on it. See §6 (replay) and §9 (scope).
 
 ---
 
@@ -161,14 +190,29 @@ Assertable moment types, mapped to the feed:
 
 | Claim | Backing actions |
 |---|---|
-| Goal | `goal` |
-| Disallowed goal | `goal` + `action_discarded` on same `Id` |
-| Red card | `red_card` |
+| Goal | `goal`, `Confirmed: true`, no later discard |
+| **VAR overturned this goal** | `var(Type=Goal)` + `var_end(Outcome=Overturned)`, **plus** `action_discarded` on an adjacent goal `Id` as corroboration |
+| **VAR overturned this penalty** | `var(Type=Penalty)` + `var_end(Outcome=Overturned)` |
+| **Referee carded the wrong player** | `var(Type=MistakenIdentity)` + `var_end(Outcome=Overturned)` |
+| VAR checked and the decision stood | `var(...)` + `var_end(Outcome=Stands)` |
+| Goal flashed and withdrawn | `action_discarded` on an unconfirmed `goal` with **no** VAR pair nearby. **Cannot claim VAR or offside — only that it was withdrawn.** |
+| Red card | `red_card`, `Confirmed: true` |
 | Yellow card | `yellow_card` (unless `unreliable_yellow_cards` in window) |
-| Penalty awarded | `penalty` |
+| Penalty awarded | `penalty`, `Confirmed: true` |
 | Penalty outcome | `penalty_outcome` (`Data.Outcome`) |
-| VAR review | `var` → `var_end` (`Data.Type`, `Data.Outcome`) |
 | Scoreline correction | `score_adjustment` |
+
+**`action_discarded` on a goal is not a disallowed goal.** This is the single
+easiest way to ship a verifier that confidently states something false. All four
+discarded goals in the corpus were **never `Confirmed: true`** — a goal is flashed
+provisionally, VAR reviews it, VAR kills it, and the operator withdraws the
+provisional goal. The discard is the *consequence*; the `var_end` is the
+*evidence*. Two of the four have a VAR pair behind them and two do not — and for
+those two you cannot say why the goal went away.
+
+**Match on the VAR pair. Use the discard only as corroboration.** A verifier that
+treats every discarded goal as "VAR disallowed it" is wrong in half the cases in
+this corpus, and being wrong is the one thing this product cannot survive.
 
 ### Step 4 — Drama Score
 
@@ -283,7 +327,8 @@ an oracle. It is not needed to prove the thesis.
 
 | Component | Does one thing | Depends on |
 |---|---|---|
-| **TXLine ingestor** | Consume SSE, normalise frames, materialise per-fixture timelines. Owns reconnect via SSE `id` cursor. | TXLine, Redis |
+| **Replay server** | Read the captured NDJSON, re-emit as SSE. Original `Ts` pacing, or accelerated. **Speaks the same protocol as TXLine.** | capture files |
+| **TXLine ingestor** | Consume SSE, normalise frames, materialise per-fixture timelines. Owns reconnect via SSE `id` cursor. Does not know or care whether the source is replay or live. | SSE source, Redis |
 | **Timeline store** | Answer "what was true at `(fixtureId, clock)`" and "what is the final state of event `Id`". | Redis |
 | **OCR reader** | Video bytes → `{clock[], score[], teamMarks[], confidence}`. Knows nothing about TXLine. | ffmpeg, OCR engine |
 | **Verifier** | ProofCard from an OCR result + a timeline. **Pure function.** No I/O. Unit-testable against the 6 captured fixtures. | — |
@@ -296,6 +341,35 @@ The verifier and drama scorer being **pure functions** is the key design
 decision. The whole trust argument is testable offline against the captured
 fixtures — no network, no flake, deterministic. That is also what makes the demo
 robust.
+
+### Replay-first — the feed source is a config swap
+
+**v1 ingests the capture via the replay server, not the live TXLine feed.** This
+is a deliberate choice, not a shortcut.
+
+- **The footage is real.** These are real matches, so real broadcast video exists.
+  OCR reads an actual broadcast overlay and joins it to an independently captured
+  feed — two sources that were never derived from each other. Had these been
+  simulated fixtures there would be no video, and the only option would be
+  rendering an overlay *from* the feed and then OCRing it back to verify against
+  that same feed. That is circular, and a judge would say so out loud.
+- **It deletes the largest build risk.** Live ingest requires the full auth flow
+  first — guest JWT → on-chain `subscribe` tx → sign `${txSig}::${jwt}` →
+  `POST /api/token/activate` — before a single frame arrives. Hours of work, four
+  failure points, all of them on the critical path and all of them live on stage.
+- **The demo is deterministic.** The same bytes, every run.
+- **The corpus is better than a live match would be.** Five confirmed VAR
+  decisions (four overturns, one stands), a wrong-player red card, extra time,
+  `score_adjustment`, `action_amend`. A live group game gives you a 0–0 and
+  nothing to verify.
+
+The replay server speaks SSE, so the ingestor is identical either way. Going live
+for the final is **a URL and the auth flow**, not a rewrite. Build replay, prove
+the pipeline, then bolt on auth once the thesis is standing.
+
+**Do not let the replay path leak into the trust story.** The clips are real, the
+feed data is real, the verification is real. The only thing replayed is the
+*transport*. Say exactly that, unprompted, before anyone asks.
 
 ### Storage — and one honest flag
 
@@ -352,14 +426,17 @@ The failure modes are the product. Each one gets an explicit, user-visible state
 
 ## 8. Testing
 
-**The captured fixtures are the test suite.** Six fixtures, 5,554 score frames,
-208,504 odds messages, including a full VAR→penalty sequence, a red card, extra
-time, `score_adjustment`, and `action_amend`. This is a real corpus.
+**The captured fixtures are the test suite.** Six real World Cup knockout matches,
+5,554 score frames, 208,504 odds messages, five confirmed VAR decisions, a red
+card, extra time, `score_adjustment`, and `action_amend`. This is not a fixture set
+someone invented to make the tests pass.
 
 | Layer | Approach |
 |---|---|
-| **Verifier** | Pure function, golden tests against all 6 fixtures. Every assertable moment type gets a positive case and a negative case. The VAR→penalty sequence on 18209181 (clock 1472–1665) and the red card on 18222446 are the marquee tests. |
-| **Overturn handling** | Replay a fixture's timeline up to a `Confirmed: true` goal, verify, then feed the later `action_discarded` and assert the flip to `OVERTURNED`. |
+| **Verifier** | Pure function, golden tests against all 6 fixtures. Marquee: `MistakenIdentity`/`Overturned` → `red_card` on 18222446 (`Id` 611→613, clock 4180–4280), and `Goal`/`Overturned` on 18237038 (`Id` 571, clock 3641). |
+| **The claim-precision tests** | **The most important tests in the suite.** 18237038 `Id` 570 and 18213979 `Id` 490 have a VAR pair → must verify as *"VAR overturned this goal"*. 18209181 `Id` 495 and 18213979 `Id` 410 have **no** VAR pair → must verify only as *"goal withdrawn"* and must **fail** an assertion of "VAR disallowed it". If these four tests pass, the verifier states exactly what it can back and nothing more. |
+| **Negative case** | 18209181 `Id` 300 is `Penalty`/`Stands` — the only non-overturn. A clip asserting "VAR overturned the penalty" here must be `REJECTED`. |
+| **Overturn handling** | Replay a fixture up to a `Confirmed: true` event, verify, then feed a later `action_discarded`/`action_amend` on that `Id` and assert the flip to `OVERTURNED`. Note: no corpus case has a *confirmed* goal later discarded, so this path needs a synthetic timeline built from real frames. |
 | **Drama scorer** | Golden scores across the known goals. The 18209181 goal at clock 3560 (2.088 → 2.691) is the reference case. |
 | **OCR** | Synthetic overlays at known clock/score, plus adversarial cases: spliced clips, occluded bugs, low bitrate. |
 | **Escrow** | Anchor tests — fund, release, budget exhaustion, double-claim rejection. |
@@ -374,9 +451,11 @@ corpus exists, and they carry the entire trust claim.
 
 ### v1 — the thesis
 
-- Ingest TXLine devnet for the 6 captured fixtures + live
+- **Replay server** over the 6 captured fixtures (Spain's and Argentina's road to
+  the final). No live auth flow.
 - OCR clock + score from broadcast overlays
-- Verify goal / red card / yellow / penalty / VAR / disallowed goal
+- Verify goal / red card / yellow / penalty / VAR overturn / `MistakenIdentity` /
+  goal-withdrawn — each claim stated only to the precision the feed supports
 - Drama Score from the odds feed
 - ProofCard anchored on Solana devnet
 - Wallet connect, 30s clip upload to Walrus
@@ -384,6 +463,16 @@ corpus exists, and they carry the entire trust claim.
 - Watermark burn gated on verification
 - Feed with Proof Cards, ranked by Drama Score
 - Re-verify on `game_finalised`, `OVERTURNED` state
+
+### v1.5 — the final, 19 July
+
+Live ingest for **Spain v Argentina**. This is the whole reason to build v1 as a
+config swap. Requires only: the TXLine auth flow (guest JWT → `subscribe` tx →
+sign → activate) and pointing the ingestor at `txline-dev.txodds.com` instead of
+the replay server.
+
+Ship v1 first. Do not build the auth flow until the pipeline verifies a clip
+end-to-end on replay.
 
 ### Explicitly out
 
@@ -410,12 +499,18 @@ structured data with a confirm cycle and a retraction mechanism.
 
 Three claims no competitor can make:
 
-1. **"This goal was disallowed" is verifiable**, against the source of record, at
-   a known second, anchored on-chain.
+1. **"VAR overturned this goal" and "the referee carded the wrong player" are
+   verifiable** — against the source of record, at a known second, anchored
+   on-chain. Not inferred from commentary. Read from an enum.
 2. **Virality is priced by a market, not counted by a platform** — objective,
    instant, ungameable.
 3. **A sponsor's logo cannot appear on a clip that isn't true** — enforced by the
    architecture, not a policy.
+
+And one accident of timing worth more than any of them: **the corpus is both
+finalists' road to a final that hasn't been played yet.** Demo the VAR-overturned
+goal from France–Spain, and the wrong-player red card from Argentina's quarter-
+final — verified, scored by the market, anchored. Then say: *we're live on Sunday.*
 
 ---
 
@@ -432,3 +527,14 @@ Three claims no competitor can make:
    trusting its own read of the feed — a materially stronger claim. Worth an email
    to TxODDS.
 5. **Devnet USDC vs SOL** for escrow denomination.
+6. **Broadcast footage rights.** World Cup video is heavily rights-encumbered.
+   Normal hackathon territory, but it is the first question a sponsor asks in a
+   real conversation, so have an answer. Does not block the build.
+7. ~~Two of six fixtures lack `historical.raw.json`.~~ **Resolved.** 18237038's
+   score stream is complete on its own — 1013 frames, `kickoff` → `game_finalised`,
+   clock 0→5816, VAR pair intact. `historical.raw.json` is a convenience, not a
+   requirement. The France–Spain marquee case is safe.
+8. **`Data.Type` / `Data.Outcome` enums are observed, not documented.** Three types
+   and two outcomes across 5 pairs is a small sample. There are almost certainly
+   more (`Offside`? `RedCard`? `NotOverturned`?). Handle unknown values without
+   crashing, and never map an unrecognised type to a human claim.

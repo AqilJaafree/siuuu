@@ -73,8 +73,8 @@ across all 6 fixtures:
 | Field | Type | Notes |
 |---|---|---|
 | `FixtureId` | int | Folder name in the capture. Primary key. |
-| `FixtureGroupId` | int | `10115675` for all 6 — the World Cup grouping. |
-| `CompetitionId` | int | `72` |
+| `FixtureGroupId` | int | **The knockout round.** `10115675` = quarter-finals (4 fixtures), `10115573` = semi-finals (2). Not a tournament-wide constant. |
+| `CompetitionId` | int | `72` — constant across all 6. The tournament. |
 | `CountryId` | int | `466` |
 | `SportId` | int | `1` (Soccer) |
 | `Type` | string | `"Soccer"` |
@@ -159,12 +159,68 @@ Filter these out. They carry no moment.
 
 | Action | n | Meaning |
 |---|---|---|
-| `var` | 10 | VAR review opened. `Data.Type` names the subject once confirmed (e.g. `{"Type":"Penalty"}`). Unconfirmed frame carries `PossibleEvent:{VAR:true}`. |
+| `var` | 10 | VAR review opened. `Data.Type` names the subject once confirmed. Unconfirmed frame carries `PossibleEvent:{VAR:true}`. **See §4.1 — this is the product.** |
 | `var_end` | 5 | Review closed. `Data.Outcome` holds the decision. |
-| `action_discarded` | 30 | **An event was retracted.** Shares `Id` with the event it kills. This is a disallowed goal / rescinded card. |
+| `action_discarded` | 30 | An event was retracted. Shares `Id` with the event it kills. **Not a referee decision by itself — see §4.1.** |
 | `action_amend` | 21 | An event was rewritten. `Data` carries `{Action, New:{...}}` — the corrected values. |
 | `score_adjustment` | 3 | Scoreline corrected out-of-band. `Clock.Seconds` is `0` on these. |
 | `unreliable_yellow_cards` | 4 | Operator flags card data as untrustworthy. **Must gate verification.** |
+
+---
+
+## 4.1 The VAR taxonomy — the most valuable structure in the feed
+
+`var` / `var_end` pairs share an `Id` and carry an explicit, structured referee
+decision. **All 5 confirmed pairs in the capture:**
+
+| Fixture | Id | Clock | `Data.Type` | `Data.Outcome` |
+|---|---|---|---|---|
+| 18209181 France–Morocco QF | 300 | 1550 → 1582 | `Penalty` | **`Stands`** |
+| 18213979 England QF | 492 | 3315 → 3406 | `Goal` | **`Overturned`** |
+| 18213979 England QF | 843 | 5968 → 6071 | `Penalty` | **`Overturned`** |
+| 18222446 Argentina QF | 611 | 4180 → 4272 | `MistakenIdentity` | **`Overturned`** |
+| 18237038 France–Spain SF | 571 | 3641 → 3653 | `Goal` | **`Overturned`** |
+
+Observed enumerations:
+
+```
+Data.Type    ∈ { Goal, Penalty, MistakenIdentity }
+Data.Outcome ∈ { Overturned, Stands }
+```
+
+**`MistakenIdentity` means the referee carded the wrong player and VAR corrected
+it.** "Referee misjudged the situation" is not something to infer from
+commentary — it is a literal enum value in the source of record.
+
+### `action_discarded` on a goal is NOT a disallowed goal
+
+This is the trap, and it is easy to fall into. All 4 discarded goals in the
+capture were **never `Confirmed: true`**:
+
+| Fixture | Goal `Id` | Clock | Confirmed? | Gap to discard | Adjacent VAR? | What it actually is |
+|---|---|---|---|---|---|---|
+| 18237038 | 570 | 3629 | **no** | 26s | **`Id` 571 `Goal`/`Overturned` @3641** | **VAR-overturned goal** |
+| 18213979 | 490 | 3262 | **no** | 148s | **`Id` 492 `Goal`/`Overturned` @3315** | **VAR-overturned goal** |
+| 18209181 | 495 | 2924 | **no** | 2s | none | goal flashed and pulled (offside on the field, or operator error) |
+| 18213979 | 410 | 2935 | **no** | 20s | none | goal flashed and pulled |
+
+Read the mechanics: a goal is flashed unconfirmed, VAR reviews it, VAR overturns
+it, and the operator discards the provisional goal. **The goal never reaches
+`Confirmed: true` precisely because VAR killed it.** The `action_discarded` is
+the *consequence*; the `var_end` is the *evidence*.
+
+So there are two genuinely different claims here and they must not be conflated:
+
+- **`var(Type=Goal)` + `var_end(Outcome=Overturned)` + `action_discarded` on an
+  adjacent goal `Id`** → *"VAR overturned this goal."* Strong, specific, backed
+  by an explicit decision. **2 cases.**
+- **`action_discarded` on an unconfirmed goal with no VAR nearby** → *"a goal was
+  flashed and withdrawn."* Weak. You cannot say why, and you must not claim VAR.
+  **2 cases.**
+
+A verifier that treats all `action_discarded`-on-goal as "disallowed goal" makes
+a false claim in half the cases in this corpus. Match on the **VAR pair**, and
+use the discard only as corroboration.
 
 ### Timing and control
 
@@ -321,18 +377,56 @@ timeline without replaying the stream.
 
 ---
 
-## 9. The six fixtures
+## 9. The six fixtures — the 2026 World Cup knockout bracket
 
-| FixtureId | Result | Notable |
-|---|---|---|
-| 18209181 | FRA–MAR 2–0 | VAR → penalty sequence at clock 1472–1665. Has historical. |
-| 18213979 | 1–2 | Extra time. `score_adjustment` + `action_amend`. Has historical. |
-| 18218149 | 2–1 | Has historical. |
-| 18222446 | 3–1 | Extra time. **The only `red_card` in the bundle.** Has historical. |
-| 18237038 | 0–2 | No historical. |
-| 18241006 | 1–2 | No historical. |
+**These are not sample fixtures.** They are the real quarter-finals and
+semi-finals of the 2026 World Cup, played 9–15 July 2026, captured live.
 
-All share `FixtureGroupId` 10115675, `CompetitionId` 72.
+Team ids decode against the published results:
+
+| id | Team |
+|---|---|
+| 1999 | France |
+| 3021 | Spain |
+| 1888 | England |
+| 1489 | Argentina |
+| 2530 | Morocco |
+| 1575, 2661, 3099 | QF opponents, unidentified |
+
+### Quarter-finals — `FixtureGroupId` 10115675
+
+| FixtureId | Kickoff (UTC) | Fixture | Result | Notable |
+|---|---|---|---|---|
+| 18209181 | Jul 9 20:00 | France (1999) v Morocco (2530) | 2–0 | **VAR → penalty, `Id` 300, clock 1550→1582, `Penalty`/`Stands`** — the only VAR decision in the corpus that *stands*. Goal flashed and pulled @2924 (no VAR). Has historical. |
+| 18218149 | Jul 10 19:00 | Spain (3021) v 1575 | 2–1 | Quietest fixture. No VAR. Has historical. |
+| 18213979 | Jul 11 21:00 | 2661 v England (1888) | 1–2 (ET) | **Two VAR overturns:** `Id` 492 `Goal`/`Overturned` @3315→3406, and `Id` 843 `Penalty`/`Overturned` @5968→6071. `score_adjustment`, `action_amend`. Has historical. |
+| 18222446 | Jul 12 01:00 | Argentina (1489) v 3099 | 3–1 (ET) | **`Id` 611 `MistakenIdentity`/`Overturned` @4180→4272, followed by the corpus's only `red_card` (`Id` 613) @4280.** The referee carded the wrong player, VAR caught it, the right player went off. Has historical. |
+
+### Semi-finals — `FixtureGroupId` 10115573
+
+| FixtureId | Kickoff (UTC) | Fixture | Result | Notable |
+|---|---|---|---|---|
+| 18237038 | Jul 14 19:00 | France (1999) v Spain (3021) | 0–2 | **`Id` 571 `Goal`/`Overturned` @3641→3653** — a goal overturned by VAR in the semi-final France lost, paired with the discarded goal `Id` 570 @3629. No historical, but the score stream is complete (`kickoff` → `game_finalised`, clock 0→5816, 1013 frames). |
+| 18241006 | Jul 15 19:00 | England (1888) v Argentina (1489) | 1–2 | No historical. |
+
+`CompetitionId` 72 throughout. **`FixtureGroupId` distinguishes the round** —
+10115675 = quarter-finals, 10115573 = semi-finals. The earlier reading that all
+six share one group id was wrong.
+
+### The bracket resolves
+
+Every QF winner appears in the correct SF: France and Spain won QF1/QF2 and met
+in SF1; England and Argentina won QF3/QF4 and met in SF2.
+
+**The final is Spain v Argentina, 19 July 2026, MetLife Stadium.** Third-place
+playoff France v England, 18 July.
+
+**The capture is both finalists' complete road to a final that has not yet been
+played.** See the design spec §6 for what this means for the build.
+
+Sources: [France 0-2 Spain, ESPN](https://www.espn.com/soccer/match/_/gameId/760514/spain-france) ·
+[FIFA match centre](https://www.fifa.com/en/match-centre/match/17/285023/289290/400021541) ·
+[Al Jazeera bracket](https://www.aljazeera.com/sports/2026/7/14/fifa-world-cup-brackets-semifinal-schedule-france-vs-spain-prediction)
 
 ---
 
@@ -343,16 +437,19 @@ All share `FixtureGroupId` 10115675, `CompetitionId` 72.
 2. **`Score` is the OCR cross-check.** The scoreboard shows the score; the feed
    knows the score at every clock value. Two independent signals agreeing is a much
    stronger claim than either alone.
-3. **Controversy is a first-class type, not an inference.** `var` / `var_end` /
-   `action_discarded` / `action_amend` mean SIUUU can verify *"this goal was
-   disallowed"* against the source of record. No other clipping platform can do
-   this.
-4. **Verify against the final timeline state.** `action_discarded` can retract a
-   `Confirmed: true` event minutes later. A verification computed at ingest time
-   can be wrong. Re-evaluate on `game_finalised`.
-5. **The odds feed prices virality before humans notice it.** Drama Score from
+3. **Controversy is a first-class type, not an inference.** `var_end` carries
+   `Data.Outcome: "Overturned"` and `Data.Type: "MistakenIdentity"`. SIUUU can
+   verify *"VAR overturned this goal"* and *"the referee carded the wrong player"*
+   against the source of record. No other clipping platform can do this.
+4. **Match on the VAR pair, not on `action_discarded`.** Half the discarded goals
+   in this corpus have no VAR behind them. See §4.1 — this is the single easiest
+   way to build a verifier that confidently states something false.
+5. **Verify against the final timeline state.** `action_discarded` and
+   `action_amend` can retract or rewrite an event minutes later. A verification
+   computed at ingest can be wrong by full time. Re-evaluate on `game_finalised`.
+6. **The odds feed prices virality before humans notice it.** Drama Score from
    suspension + displacement is the sponsor discovery mechanism.
-6. **`unreliable_yellow_cards` exists.** The feed tells you when it does not trust
+7. **`unreliable_yellow_cards` exists.** The feed tells you when it does not trust
    itself. Refuse to verify card claims in a window flagged unreliable.
-7. **Watch `ConnectionId` changes and `disconnected` frames.** Gaps in the feed are
+8. **Watch `ConnectionId` changes and `disconnected` frames.** Gaps in the feed are
    visible; do not verify into a gap.

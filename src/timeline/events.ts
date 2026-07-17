@@ -21,14 +21,20 @@ export function resolveEvent(tl: Timeline, eventId: number): EventState | null {
   for (const f of primary) if (!actions.includes(f.action)) actions.push(f.action)
 
   const withClock = primary.find((f) => f.clock !== null)
+  const rawClock = withClock?.clock ?? null
+
+  // Apply any correction. TXLine retracting a clock and us reporting the retracted
+  // value anyway is exactly the kind of false statement this product cannot make.
+  const corrected =
+    rawClock === null ? undefined : tl.amendIndex.get(`${actions[0]}|${rawClock}`)
 
   return {
     eventId,
     actions,
     confirmed: primary.some((f) => f.confirmed === true),
     discarded: frames.some((f) => f.action === 'action_discarded'),
-    amended: frames.find((f) => f.action === 'action_amend') ?? null,
-    clock: withClock?.clock ?? null,
+    clock: corrected ?? rawClock,
+    amendedFrom: corrected === undefined ? null : rawClock,
     participant: primary.find((f) => f.participant !== null)?.participant ?? null,
     frames,
   }

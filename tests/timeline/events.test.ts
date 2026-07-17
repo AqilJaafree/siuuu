@@ -31,12 +31,29 @@ describe('resolveEvent', () => {
     expect(e.confirmed).toBe(true) // it WAS confirmed, then killed — both facts matter
   })
 
-  it('captures action_amend', () => {
+  it('applies action_amend, which does NOT share its target id', () => {
+    // Real corpus shape: the amend carries its OWN id (460) and names the yellow
+    // card it corrects (id 113) by payload. 0 of 23 amends share their target id,
+    // so an id-join silently never fires and the retracted clock survives.
     const tl = buildTimeline(1, [
-      normalizeScoreFrame(raw({ Seq: 1, Id: 5, Action: 'shot', Confirmed: true })),
-      normalizeScoreFrame(raw({ Seq: 2, Id: 5, Action: 'action_amend', Data: { Action: 'shot', New: {} } })),
+      normalizeScoreFrame(raw({ Seq: 1, Id: 113, Action: 'yellow_card', Confirmed: true, Clock: { Running: true, Seconds: 518 } })),
+      normalizeScoreFrame(raw({ Seq: 2, Id: 460, Action: 'action_amend', Data: {
+        Action: 'yellow_card',
+        Previous: { Clock: { Running: true, Seconds: 518 }, PlayerId: 182068 },
+        New: { Clock: { Running: true, Seconds: 479 }, PlayerId: 182068 },
+      } })),
     ])
-    expect(resolveEvent(tl, 5)!.amended).not.toBeNull()
+    const e = resolveEvent(tl, 113)!
+    expect(e.clock).toBe(479)       // the corrected value
+    expect(e.amendedFrom).toBe(518) // the value TXLine retracted, kept for the proof
+  })
+
+  it('leaves an unamended event alone', () => {
+    const tl = buildTimeline(1, [
+      normalizeScoreFrame(raw({ Seq: 1, Id: 5, Confirmed: true, Clock: { Running: true, Seconds: 100 } })),
+    ])
+    expect(resolveEvent(tl, 5)!.clock).toBe(100)
+    expect(resolveEvent(tl, 5)!.amendedFrom).toBeNull()
   })
 
   it('returns null for an unknown event id', () => {
@@ -54,6 +71,44 @@ describe('resolveEvent', () => {
       normalizeScoreFrame(raw({ Seq: 2, Id: 300, Action: 'var_end', Confirmed: true })),
     ])
     expect(resolveEvent(tl, 300)!.actions).toEqual(['var', 'var_end'])
+  })
+})
+
+describe('real corpus: action_amend is applied', () => {
+  // The live false claim this join fixes. Fixture 18237038 amends yellow card
+  // Id 113 from clock 518 to 479. The amend carries its own Id (460) and names
+  // its target by payload, so the old Id-join never fired and the verifier
+  // reported 518 — a value the source of record had retracted.
+  it('18237038 yellow card 113 reports the corrected clock 479, not the retracted 518', () => {
+    const tl = timelineFromCapture(loadFixture(CORPUS_ROOT, 18237038), { mergeHistorical: true })
+    const e = resolveEvent(tl, 113)!
+    expect(e.actions).toContain('yellow_card')
+    expect(e.clock).toBe(479)
+    expect(e.amendedFrom).toBe(518)
+  })
+
+  it('no amend shares its target event id, corpus-wide', () => {
+    for (const fixtureId of [18209181, 18213979, 18218149, 18222446, 18237038, 18241006]) {
+      const tl = timelineFromCapture(loadFixture(CORPUS_ROOT, fixtureId), { mergeHistorical: true })
+      for (const f of tl.frames) {
+        if (f.action !== 'action_amend') continue
+        const target = (f.data as { Action?: unknown }).Action
+        const sharing = (tl.byEventId.get(f.eventId!) ?? []).map((x) => x.action)
+        // If an amend ever shared its target's id, an id-join would be viable and
+        // this payload join would need revisiting. It never does.
+        expect(sharing).not.toContain(target)
+      }
+    }
+  })
+
+  it('leaves clock-noop amends unamended (they correct a non-clock field)', () => {
+    // 22 of 23 corpus amends repeat the clock and change Outcome/FreeKickType/
+    // PlayerId. Reporting amendedFrom on those would claim a clock correction
+    // the feed never made. Event 63 in 18209181 is a shot amended OnTarget->OffTarget.
+    const tl = timelineFromCapture(loadFixture(CORPUS_ROOT, 18209181), { mergeHistorical: true })
+    const e = resolveEvent(tl, 63)!
+    expect(e.clock).toBe(215)
+    expect(e.amendedFrom).toBeNull()
   })
 })
 

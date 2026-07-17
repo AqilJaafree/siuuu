@@ -58,6 +58,20 @@ export interface Timeline {
   /** eventId -> every frame sharing it, seq ascending. */
   byEventId: Map<number, Frame[]>
   coverage: Coverage
+  /**
+   * `${targetAction}|${previousClock}` -> corrected clock.
+   *
+   * `action_amend` does NOT share its target's `Id` — 0 of 23 in the corpus do. It
+   * carries its own fresh `Id` and names its target by payload (`Data.Action` +
+   * `Data.Previous`). Joining on `Id` means amendments are silently never applied,
+   * and the timeline reports a clock the feed explicitly retracted.
+   *
+   * Only clock-MOVING amends are indexed. 22 of the 23 amends in the corpus leave
+   * `Clock.Seconds` untouched and correct some other field (`Outcome`,
+   * `FreeKickType`, `PlayerId`); indexing those would make `amendedFrom` claim a
+   * correction that never happened.
+   */
+  amendIndex: Map<string, number>
 }
 
 export interface VarDecision {
@@ -80,9 +94,10 @@ export interface EventState {
   confirmed: boolean
   /** true if an action_discarded shares this id. */
   discarded: boolean
-  /** The action_amend frame, if any. */
-  amended: Frame | null
+  /** Effective clock, AFTER any action_amend correction. */
   clock: number | null
+  /** The clock TXLine first reported, if an amend moved it. Null when unamended. */
+  amendedFrom: number | null
   participant: 1 | 2 | null
   frames: Frame[]
 }

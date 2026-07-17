@@ -336,30 +336,66 @@ omits zeros; `Stats` is dense and positional. Use `Stats` only as a cross-check.
 | `Bookmaker` / `BookmakerId` | Always `TXLineStablePriceDemargined` / `10021`. Demargined = vig removed, so prices are ~true probability. |
 | `SuperOddsType` | `OVERUNDER_PARTICIPANT_GOALS` (95,791) · `ASIANHANDICAP_PARTICIPANT_GOALS` (82,484) · `1X2_PARTICIPANT_RESULT` (30,229) |
 | `MarketParameters` | `line=<n>` for over/under and handicap; `null` for 1X2 |
-| `PriceNames` / `Prices` | Parallel arrays. **Prices are integers scaled ×1000** — `2088` = decimal odds 2.088. |
-| `InRunning` | true = live |
+| `MarketPeriod` | **`null` = full match · `"half=1"` = first half · `"et"` = extra time.** All stream concurrently. **Not always null** — see below. |
+| `PriceNames` / `Prices` | Parallel arrays. Stable ordering: 1X2 is always `("part1","draw","part2")` (all 30,229), handicap `("part1","part2")`, over/under `("over","under")`. **Prices are integers scaled ×1000** — `2088` = decimal odds 2.088. |
+| `InRunning` | `true` = live, `false` = pre-match. ~10K messages are pre-match. Filter them. |
 | `Pct` | `"NA"` throughout the capture |
 
-### Suspension is a signal
+### `MarketPeriod` is the trap
 
-**2,979 messages (1.4%) carry an empty `Prices: []`.** That is the market
-suspending — the operator pulling prices because something is happening.
+Three markets stream **at the same time** for one fixture:
 
-Measured on fixture 18209181, `line=2.25`, around the confirmed goal at
-`Clock.Seconds` 3560:
+| `SuperOddsType` | `MarketPeriod` | n |
+|---|---|---|
+| 1X2 | `null` (full match) | 18,101 |
+| 1X2 | `half=1` | 7,595 |
+| 1X2 | `et` | 2,503 |
 
-- immediately before: `Prices: []` — **suspended**
-- ~20s after: `[2691, 1591]`
-- baseline earlier in the match: `[2088, 1919]`
+Filter on `SuperOddsType` alone and you will compare a **first-half** price against
+a **full-match** price. At 33 minutes and 0–0 a first-half draw sits near 0.63
+probability while the full-match draw sits near 0.26 — so the naive filter reports
+a violent market move on a window where nothing happened. Measured: a phantom TVD
+of **0.367** on a dead-quiet window that scores **0.000** once
+`MarketPeriod === null && InRunning === true` is applied.
 
-Decimal odds on *over* moved 2.088 → 2.691 (+29%) across the goal. The market
-suspended, absorbed the event, and repriced.
+**Always filter to `MarketPeriod === null` and `InRunning === true`** for
+match-outcome signal.
 
-**This is the Drama Score.** Suspension duration plus post-resume price
-displacement gives an objective, market-priced measure of how much a moment
-mattered — available seconds after it happens, with no view counts, no
-engagement metrics, and nothing a clipper can game. See the design spec for the
-scoring formula.
+### Reading price movement correctly
+
+**2,979 messages (1.4%) carry an empty `Prices: []`** — the market suspending
+because something is happening. Useful, but a weaker signal than it looks: the
+biggest moments in the corpus show 0s of suspension.
+
+**Prices are demargined**, so `1000 / price` is a true probability and the 1X2
+triple sums to ~1. **Use probability space, never log-ratio on raw odds.** Log
+space explodes on longshots — a 9.4 → 47.9 drift is `|ln| = 1.63` and swamps real
+signal. An early scorer built that way rated a dead-quiet window **57/100**.
+
+The correct measure is **total variation distance** on the 1X2 probability vector:
+`0.5 * Σ|p_after − p_before|`. Bounded [0,1], interpretable as "how much
+probability mass moved". Measured on real windows:
+
+| Fixture / window | TVD | probability before → after |
+|---|---|---|
+| 18209181 goal @3560 | **0.348** | `[0.52,0.37,0.11]` → `[0.87,0.11,0.02]` |
+| 18213979 VAR goal overturned @3250 | **0.301** | `[0.20,0.39,0.41]` → `[0.50,0.31,0.18]` |
+| 18222446 mistaken-identity red card | **0.140** | `[0.32,0.54,0.14]` → `[0.46,0.47,0.07]` |
+| 18209181 goal @3922 (already 0.86 up) | 0.119 | `[0.86,0.12,0.02]` → `[0.98,0.02,0.00]` |
+| 18237038 VAR goal overturned | **0.004** | `[0.03,0.10,0.86]` → `[0.03,0.10,0.87]` |
+| 18209181 quiet control @2000 | **0.000** | `[0.62,0.26,0.12]` → `[0.62,0.26,0.12]` |
+
+### This measures impact, not drama
+
+Note rows 5 and 6. The France–Spain VAR-overturned goal scores **0.004** — the
+market ended where it started, because the goal was overturned and because it was
+flashed for Spain, already at 0.86 and already 2–0 up. Nothing about the outcome
+changed. **The market is correct, and useless for ranking controversy.**
+
+So market movement is an **impact** axis and cannot carry drama on its own.
+Controversy needs a second axis read from the VAR taxonomy (§4.1). See the design
+spec §4 for both formulas and why collapsing them into one number destroys the
+most interesting moments in the corpus.
 
 ---
 
@@ -392,6 +428,26 @@ Team ids decode against the published results:
 | 1489 | Argentina |
 | 2530 | Morocco |
 | 1575, 2661, 3099 | QF opponents, unidentified |
+
+### Clock coverage — the score stream does not always start at kickoff
+
+| FixtureId | Stream covers | Biggest gap | `historical.raw.json` |
+|---|---|---|---|
+| 18209181 | **19:19** → 96:08 | **1159s at the start** | yes — **required** for the first 19 min |
+| 18218149 | **28:39** → 97:01 | **1719s at the start** | yes — **required** for the first 28 min |
+| 18213979 | 0:00 → 122:07 | 221s @1367 | yes |
+| 18222446 | 0:00 → 123:48 | 216s @1333 | yes |
+| 18237038 | 0:00 → 96:56 | 193s @1411 | **no** — stream is complete on its own |
+| 18241006 | 0:00 → 101:43 | 201s @1446 | **no** — stream is complete on its own |
+
+Two fixtures' captures began mid-match: 18209181 at 19:19 and 18218149 at 28:39.
+Their opening minutes exist **only** in `historical.raw.json`. Conveniently, the
+two fixtures *without* historical are exactly the two whose streams run clean from
+kickoff — so the corpus is fully usable, but **`historical.raw.json` is required,
+not a convenience**, and parsing it means stripping the `data: ` SSE prefix (§8).
+
+Typical frame spacing is ~4.5s, but gaps up to ~220s exist mid-match. **A 30s clip
+window can legitimately contain zero frames.** That is `UNVERIFIABLE`, not a bug.
 
 ### Quarter-finals — `FixtureGroupId` 10115675
 
@@ -447,8 +503,11 @@ Sources: [France 0-2 Spain, ESPN](https://www.espn.com/soccer/match/_/gameId/760
 5. **Verify against the final timeline state.** `action_discarded` and
    `action_amend` can retract or rewrite an event minutes later. A verification
    computed at ingest can be wrong by full time. Re-evaluate on `game_finalised`.
-6. **The odds feed prices virality before humans notice it.** Drama Score from
-   suspension + displacement is the sponsor discovery mechanism.
+6. **The odds feed prices impact, not virality.** 1X2 probability TVD is objective
+   and instant, but a VAR overturn that changes nothing scores ~0. Controversy must
+   be scored separately from the VAR taxonomy. Filter to `MarketPeriod === null`
+   and `InRunning === true`, and work in probability space — both mistakes produce
+   confident nonsense.
 7. **`unreliable_yellow_cards` exists.** The feed tells you when it does not trust
    itself. Refuse to verify card claims in a window flagged unreliable.
 8. **Watch `ConnectionId` changes and `disconnected` frames.** Gaps in the feed are

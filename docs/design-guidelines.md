@@ -48,7 +48,8 @@ tones, no 50-step ramps.
   --pending:    #FFD600;   /* NEEDS_REVIEW / PENDING. yellow. in motion. */
 
   /* Product */
-  --drama:      #FF006E;   /* Drama Score. magenta. the market talking. */
+  --impact:     #FF006E;   /* Impact score. magenta. the market talking. */
+  --controv:    #FF4D00;   /* Controversy score. orange. the referee talking. */
   --sponsor:    #6D3BFF;   /* sponsor / money surfaces. violet. */
   --live:       #FF0000;   /* live match only. never anything else. */
 
@@ -70,7 +71,10 @@ light) against the dark card. Test both.
   accent, never on a button, never because a section needed some colour. The
   moment green means "nice" instead of "true", the product's core signal is dead.
 - `--live` red appears **only** on in-running matches.
-- `--drama` magenta belongs to the Drama Score and its rankings. Nothing else.
+- `--impact` magenta belongs to the Impact score and its rankings. `--controv`
+  orange belongs to the Controversy score. Nothing else. They share orange with
+  `--overturned` deliberately — a high controversy score and an overturned verdict
+  are the same worldview.
 - Everything else is ink on paper. **Colour is information here, not styling.**
 
 #### Contrast
@@ -191,9 +195,16 @@ Contents, in order:
    `Seq`, `Confirmed`. This is raw feed data and it should **look** raw. Put it in
    a `--sunk` well. Do not prettify it. Do not humanise the action names — `var_end`
    stays `var_end`. The rawness *is* the credibility.
-4. **Drama Score** — big display number, `--drama`, with the market evidence
-   underneath in mono: suspension duration, price move (`2.088 → 2.691`, `+29%`).
-   Show the arithmetic. The score means nothing without it.
+4. **Impact and Controversy** — two big display numbers, side by side, never
+   summed. Impact in `--impact`, with the market arithmetic in mono beneath:
+   probability vector before → after, TVD, suspension
+   (`[0.52,0.37,0.11] → [0.87,0.11,0.02]  TVD 0.348`). Controversy in `--controv`,
+   naming its backing event (`var(MistakenIdentity) + Overturned`). Show the
+   arithmetic — a score without its evidence is just an opinion.
+
+   **Never average them into one number.** A 1/100 impact next to a 90/100
+   controversy is the France–Spain moment, and collapsing it to 45 destroys the
+   only interesting thing about it.
 5. **OCR confidence** — a plain bar. Honest when it's low.
 6. **Anchor** — `contentHash` and Solana devnet signature, mono, truncated middle,
    copy button, link to explorer.
@@ -210,8 +221,8 @@ for each. The overturn is usually the better story than the goal was.
 
 ### Clip tile (feed)
 
-Card + 16:9 thumbnail. Status badge overlaid top-left. Drama Score top-right as a
-mono number on `--drama`. Sponsor watermark visible in-frame (it's burned into the
+Card + 16:9 thumbnail. Status badge overlaid top-left. Impact and Controversy
+top-right as two mono numbers on `--impact` / `--controv`. Sponsor watermark visible in-frame (it's burned into the
 video — it renders because it's *in* the pixels, which is the point).
 
 Tile is `--border`, `--shadow`. In a grid, tiles do **not** overlap or stagger —
@@ -225,7 +236,7 @@ Pulse via opacity `1 → 0.3 → 1`, 1.5s. No glow, no scale, no blur.
 ### Sponsor campaign surfaces
 
 `--sponsor` violet. Budget and bounty figures in **mono** — they're money, money
-is a fact. Targeting filters (fixture, event types, minDrama) as chunky toggle
+is a fact. Targeting filters (fixture, event types, minImpact, minControversy) as chunky toggle
 chips: bordered, `--shadow`, filled `--ink` when active.
 
 The campaign builder should feel like filling in a form on paper. That's the right
@@ -278,7 +289,7 @@ motion, which is a good sign about the design.
 
 The style is an accessibility asset — use it.
 
-- **Focus:** `outline: 3px solid var(--drama); outline-offset: 3px`. Visible,
+- **Focus:** `outline: 3px solid var(--impact); outline-offset: 3px`. Visible,
   on-brand, never removed.
 - **Contrast:** AA minimum on everything. Ink-on-chroma is the default and it
   passes comfortably.

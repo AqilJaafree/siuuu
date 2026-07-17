@@ -52,11 +52,15 @@ at a known second. Every event arrives twice (`Confirmed: false` → `true`) sha
 a stable `Id`, so the feed records exactly when a decision was made and when it
 was reversed.
 
-**The odds feed is a drama oracle.** Around a confirmed goal the market suspends
-(empty `Prices` — 2,979 of 208,504 messages in the capture) and then reprices
-hard. Measured on fixture 18209181: over-2.25 moved from decimal 2.088 to 2.691,
-+29%, across one goal, with a suspension window in between. The market prices
-significance in seconds, objectively, and a clipper cannot fake it.
+**The odds feed prices match impact objectively.** Prices are demargined, so
+`1000/price` is a true probability. Across the confirmed goal at clock 3560 in
+18209181, the full-match 1X2 probability vector moved `[0.52, 0.37, 0.11]` →
+`[0.87, 0.11, 0.02]` — a total-variation distance of **0.348**. Across a quiet
+control window in the same match: **0.000**, the market did not twitch. The market
+prices significance in seconds and a clipper cannot fake it.
+
+But market movement is **impact, not drama** — the two come apart, and §4 shows
+where. That distinction drives the whole scoring design.
 
 So: **the clock is the join key.** Broadcast overlays burn the match clock and
 scoreline into the video. TXLine knows the full state at every `Clock.Seconds`.
@@ -91,7 +95,8 @@ days away — and then runs live on it. See §6 (replay) and §9 (scope).
 
 **SIUUU** is a PWA where clippers cut 30-second World Cup moments, every clip is
 cryptographically verified against TXLine and anchored on Solana, and sponsors
-fund bounties on verified moments ranked by market-measured drama.
+fund bounties on verified moments scored on two objective axes: market impact and
+referee controversy.
 
 The pitch in one line: **the sponsor's logo cannot appear on a clip that isn't
 true.**
@@ -102,8 +107,9 @@ true.**
 eligible campaigns, gets paid on verification. Not on views. On *truth*.
 
 **Sponsor** — funds a campaign escrow on Solana devnet, targets by fixture, event
-type, and minimum Drama Score, and watches verified clips carrying their
-watermark appear in a live feed. They are buying moments, not impressions.
+type, and minimum impact / controversy, and watches verified clips carrying their
+watermark appear in a live feed. They are buying moments, not impressions. Some
+brands want the winning goal; some want the argument. Two axes let both buy.
 
 **Viewer** — browses the feed. Every clip carries a Proof Card. Tap it and see
 exactly which TXLine events back the claim, at which clock values, anchored to
@@ -131,12 +137,14 @@ This is the core of the product. Everything else is packaging.
   │  3. Match     │   Confirmed:true frames ONLY
   └───────┬───────┘   then: any later action_discarded/amend on that Id?
           ▼
-  ┌───────────────┐   suspension duration + StablePrice displacement
-  │  4. Drama     │   across the clip window → 0..100
+  ┌───────────────┐   Impact: 1X2 probability-vector TVD (market)
+  │ 4. Impact +   │   Controversy: VAR/discipline taxonomy (enum)
+  │  Controversy  │   two axes, 0..100 each — see below
   └───────┬───────┘
           ▼
   ┌───────────────┐   {fixtureId, clockWindow, matchedEvents[],
-  │  5. Proof     │    seqRange, contentHash, ocrConfidence, drama}
+  │  5. Proof     │    seqRange, contentHash, ocrConfidence,
+  │               │    impact, controversy}
   └───────┬───────┘   → sha256 → anchor on Solana devnet
           ▼
   ┌───────────────┐   burn sponsor watermark, publish, release bounty
@@ -214,23 +222,78 @@ those two you cannot say why the goal went away.
 treats every discarded goal as "VAR disallowed it" is wrong in half the cases in
 this corpus, and being wrong is the one thing this product cannot survive.
 
-### Step 4 — Drama Score
+### Step 4 — Impact and Controversy (two axes, not one)
 
-Computed from the odds feed across the clip's clock window. Three components:
+**A single "drama score" does not work, and the corpus proves it.** Measured on
+the real data:
 
-- **Suspension** — total duration of empty-`Prices` windows. The market pulling
-  prices means the operator saw something.
-- **Displacement** — max absolute log-change in demargined price across the window,
-  taken on the most liquid line. Prices are integers scaled ×1000.
-- **Breadth** — how many `SuperOddsType` markets moved together
-  (`1X2_PARTICIPANT_RESULT` shifting alongside `OVERUNDER_PARTICIPANT_GOALS` means
-  the match state changed, not just noise).
+| Moment | Market move | Human interest |
+|---|---|---|
+| Clean goal @3560 (18209181) | TVD **0.348** — huge | mild |
+| Mistaken-identity red card (18222446) | TVD **0.140** — big | huge |
+| VAR-overturned goal (18237038) | TVD **0.004** — nothing | **huge** |
 
-Normalised to 0–100 against the fixture's own distribution, so a drab group game
-and a final are scored on their own terms.
+The France–Spain overturned goal scores ~zero because the goal was *overturned* —
+the market ended exactly where it started — and because the flashed goal was for
+Spain, already at 0.86 win probability and already 2–0 up. Nothing about the
+outcome changed. The market is right. But it was the most talked-about moment of
+the match.
 
-Drama Score is **computed, not claimed**. It is a market fact. A clipper cannot
-inflate it and a sponsor can audit it.
+**Market movement measures match impact, not drama.** So SIUUU scores two
+independent axes:
+
+#### Impact (0–100) — from the odds feed
+
+Computed on **full-match, in-running 1X2 only** (`MarketPeriod === null`,
+`InRunning === true`). This filter is load-bearing — see below.
+
+- **Displacement** — total variation distance between the implied-probability
+  vectors before and after the window. Prices are demargined, so `1000/price` is a
+  true probability and the three sum to ~1. TVD is bounded [0,1] and interpretable
+  as "how much probability mass moved".
+- **Suspension** — longest empty-`Prices` run in the window.
+
+`impact = round(100 * (0.8 * min(1, TVD/0.5) + 0.2 * min(1, suspensionSec/30)))`
+
+**Do not use log-ratio on raw odds.** It explodes on longshots — a 9.4 → 47.9
+drift is `|ln| = 1.63` and swamps real signal. An early version of this scorer
+rated a dead-quiet window at 57/100 for exactly this reason.
+
+**Do not mix market periods.** `MarketPeriod` takes `null` (full match), `"half=1"`
+(first half), and `"et"` (extra time), all streaming concurrently. Comparing a
+first-half price to a full-match price produced a phantom TVD of 0.367 on a window
+where the full-match market did not move at all. With the correct filter that
+window scores **exactly 0.000**.
+
+#### Controversy (0–100) — from the event taxonomy
+
+Deterministic lookup, not a model:
+
+| Backing | Score |
+|---|---|
+| `var(MistakenIdentity)` + `Overturned` | 100 |
+| `var(Goal)` + `Overturned` | 90 |
+| `var(Penalty)` + `Overturned` | 85 |
+| `red_card` | 70 |
+| `score_adjustment` | 60 |
+| goal withdrawn, no VAR | 50 |
+| `var(*)` + `Stands` | 40 |
+| `yellow_card` | 20 |
+| clean `goal` | 10 |
+
+Both axes are **computed, not claimed** — one from a market, one from an enum.
+A clipper can inflate neither, and a sponsor can audit both.
+
+#### Why two axes is a better product
+
+A sponsor may want to *avoid* controversy. A boot brand buys the winning goal
+(high impact, low controversy). A betting brand buys the VAR argument (high
+controversy, any impact). One number cannot sell to both, and forcing them onto a
+single scale would have made the France–Spain moment invisible and the marquee
+red card look mediocre.
+
+The jackpot is **high on both**: the mistaken-identity red card in Argentina's
+quarter-final — impact 22, controversy 100.
 
 ### Step 5 — Proof
 
@@ -243,7 +306,8 @@ ProofCard {
   seqRange:       [u32, u32]   // TXLine Seq bounds — the audit window
   contentHash:    [u8; 32]     // sha256 of the clip bytes
   ocrConfidence:  u8
-  dramaScore:     u8
+  impact:         u8      // 0-100, from the market
+  controversy:    u8      // 0-100, from the event taxonomy
   status:         VERIFIED | OVERTURNED | REJECTED
 }
 ```
@@ -278,7 +342,8 @@ Campaign {
   targeting: {
     fixtures:     [u64]
     eventTypes:   [ActionKind]   // e.g. [red_card, var, action_discarded]
-    minDrama:     u8
+    minImpact:      u8
+    minControversy: u8
   }
   watermarkUri:   String
   active:         bool
@@ -290,8 +355,9 @@ verification passes → escrow releases `bountyPerClip` to the clipper's wallet,
 `remaining` decrements → clip publishes with watermark.
 
 A campaign only accepts clips its targeting matches, so a sponsor who wants
-`minDrama: 80` and `[red_card, action_discarded]` is literally buying
-controversy, priced by the market, verified against the source of record.
+`minControversy: 80` is literally buying referee controversy, verified against the
+source of record — while a sponsor who wants `minImpact: 50, maxControversy: 20`
+is buying clean decisive football and explicitly avoiding the argument.
 
 **Views as a stretch goal, not v1.** A virality bonus tier can layer on later via
 an oracle. It is not needed to prove the thesis.
@@ -332,7 +398,8 @@ an oracle. It is not needed to prove the thesis.
 | **Timeline store** | Answer "what was true at `(fixtureId, clock)`" and "what is the final state of event `Id`". | Redis |
 | **OCR reader** | Video bytes → `{clock[], score[], teamMarks[], confidence}`. Knows nothing about TXLine. | ffmpeg, OCR engine |
 | **Verifier** | ProofCard from an OCR result + a timeline. **Pure function.** No I/O. Unit-testable against the 6 captured fixtures. | — |
-| **Drama scorer** | Odds window → 0–100. Pure. | — |
+| **Impact scorer** | Odds window → 0–100 via 1X2 probability TVD. **Pure.** | — |
+| **Controversy scorer** | Matched events → 0–100 via taxonomy lookup. **Pure.** | — |
 | **Anchor client** | ProofCard → sha256 → devnet tx. | Solana |
 | **Escrow program** | Campaign PDA, fund, release, close. | Anchor |
 | **Blob store** | Put/get 30s clips by content hash. | Walrus |
@@ -395,7 +462,7 @@ of truth.
 1. Clipper selects fixture + clock window in the PWA, uploads 30s.
 2. Ingest hashes bytes, puts to Walrus, writes pending record to Redis.
 3. Verifier runs OCR → resolve → match against the Redis timeline.
-4. Drama scorer reads the odds window.
+4. Impact scorer reads the odds window; controversy scorer reads the matched events.
 5. ProofCard built → sha256 → anchored on devnet.
 6. If `VERIFIED` and a campaign matches: watermark burned, escrow releases bounty.
 7. Clip publishes to the feed with its Proof Card.
@@ -437,7 +504,8 @@ someone invented to make the tests pass.
 | **The claim-precision tests** | **The most important tests in the suite.** 18237038 `Id` 570 and 18213979 `Id` 490 have a VAR pair → must verify as *"VAR overturned this goal"*. 18209181 `Id` 495 and 18213979 `Id` 410 have **no** VAR pair → must verify only as *"goal withdrawn"* and must **fail** an assertion of "VAR disallowed it". If these four tests pass, the verifier states exactly what it can back and nothing more. |
 | **Negative case** | 18209181 `Id` 300 is `Penalty`/`Stands` — the only non-overturn. A clip asserting "VAR overturned the penalty" here must be `REJECTED`. |
 | **Overturn handling** | Replay a fixture up to a `Confirmed: true` event, verify, then feed a later `action_discarded`/`action_amend` on that `Id` and assert the flip to `OVERTURNED`. Note: no corpus case has a *confirmed* goal later discarded, so this path needs a synthetic timeline built from real frames. |
-| **Drama scorer** | Golden scores across the known goals. The 18209181 goal at clock 3560 (2.088 → 2.691) is the reference case. |
+| **Impact scorer** | Golden scores on real windows: clean goal @3560 → TVD 0.348 / impact 56; VAR-overturned goal 18237038 → TVD 0.004 / impact 1; mistaken-identity red card → TVD 0.140 / impact 22. **The control test is the important one:** a quiet window (18209181, clock 2000–2030) must score **exactly 0.000** — it catches both the longshot-log bug and the market-period mixing bug. |
+| **Controversy scorer** | Pure lookup. One test per taxonomy row. |
 | **OCR** | Synthetic overlays at known clock/score, plus adversarial cases: spliced clips, occluded bugs, low bitrate. |
 | **Escrow** | Anchor tests — fund, release, budget exhaustion, double-claim rejection. |
 | **E2E** | One devnet path: upload → verify → anchor → watermark → payout. |
@@ -456,12 +524,12 @@ corpus exists, and they carry the entire trust claim.
 - OCR clock + score from broadcast overlays
 - Verify goal / red card / yellow / penalty / VAR overturn / `MistakenIdentity` /
   goal-withdrawn — each claim stated only to the precision the feed supports
-- Drama Score from the odds feed
+- Impact score (market TVD) and Controversy score (event taxonomy)
 - ProofCard anchored on Solana devnet
 - Wallet connect, 30s clip upload to Walrus
 - Sponsor campaign escrow, targeting, fixed bounty
 - Watermark burn gated on verification
-- Feed with Proof Cards, ranked by Drama Score
+- Feed with Proof Cards, rankable by Impact or Controversy
 - Re-verify on `game_finalised`, `OVERTURNED` state
 
 ### v1.5 — the final, 19 July
@@ -502,8 +570,8 @@ Three claims no competitor can make:
 1. **"VAR overturned this goal" and "the referee carded the wrong player" are
    verifiable** — against the source of record, at a known second, anchored
    on-chain. Not inferred from commentary. Read from an enum.
-2. **Virality is priced by a market, not counted by a platform** — objective,
-   instant, ungameable.
+2. **Impact is priced by a market and controversy is read from an enum** — both
+   objective, instant, ungameable. Neither is a view count.
 3. **A sponsor's logo cannot appear on a clip that isn't true** — enforced by the
    architecture, not a policy.
 
@@ -530,10 +598,12 @@ final — verified, scored by the market, anchored. Then say: *we're live on Sun
 6. **Broadcast footage rights.** World Cup video is heavily rights-encumbered.
    Normal hackathon territory, but it is the first question a sponsor asks in a
    real conversation, so have an answer. Does not block the build.
-7. ~~Two of six fixtures lack `historical.raw.json`.~~ **Resolved.** 18237038's
-   score stream is complete on its own — 1013 frames, `kickoff` → `game_finalised`,
-   clock 0→5816, VAR pair intact. `historical.raw.json` is a convenience, not a
-   requirement. The France–Spain marquee case is safe.
+7. ~~Two of six fixtures lack `historical.raw.json`.~~ **Resolved, but inverted.**
+   18237038's stream is complete on its own (clock 0→5816, VAR pair intact), so the
+   France–Spain marquee case is safe. But 18209181 and 18218149 have streams that
+   **start at 19:19 and 28:39** — their opening minutes exist only in
+   `historical.raw.json`, so it is **required**, not a convenience. Parsing it means
+   stripping the `data: ` SSE prefix.
 8. **`Data.Type` / `Data.Outcome` enums are observed, not documented.** Three types
    and two outcomes across 5 pairs is a small sample. There are almost certainly
    more (`Offside`? `RedCard`? `NotOverturned`?). Handle unknown values without

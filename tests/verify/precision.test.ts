@@ -187,3 +187,21 @@ describe('PRECISION: the VAR context window does not over-reach', () => {
     expect(verify(tl(18209181), claim(18209181, 2910, 2940, 'var_stands')).status).toBe('REJECTED')
   })
 })
+
+describe('PRECISION: rejection text names what is EFFECTIVELY in the window', () => {
+  // The describeWindow half of the amend bug. Matching already used corrected
+  // clocks; the explanatory text did not. Its stated job is telling a sponsor what
+  // IS there, so naming an event the feed moved out of the window is a false
+  // statement even in a rejection. 18237038's yellow card was amended 518 -> 479.
+  it('does not name the card in the window it was moved OUT of (505-535)', () => {
+    const r = verify(tl(18237038), claim(18237038, 505, 535, 'goal'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).not.toMatch(/yellow_card/)
+  })
+
+  it('does name the card in the window it was moved INTO (465-495)', () => {
+    const r = verify(tl(18237038), claim(18237038, 465, 495, 'goal'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).toMatch(/yellow_card/)
+  })
+})

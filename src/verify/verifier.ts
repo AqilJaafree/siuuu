@@ -1,7 +1,7 @@
 import type { Timeline, EventState, VarDecision } from '../timeline/types.js'
 import { allEvents } from '../timeline/events.js'
 import { varDecisions } from '../timeline/var.js'
-import { framesInClockWindow } from '../timeline/clock.js'
+import { framesInClockWindow, framesInEffectiveClockWindow } from '../timeline/clock.js'
 import type { Claim, VerifyResult, MatchedEvent, ClaimKind } from './types.js'
 
 /**
@@ -10,8 +10,13 @@ import type { Claim, VerifyResult, MatchedEvent, ClaimKind } from './types.js'
  * holds neither end, so search both directions.
  *
  * Validated on all six fixtures: catches all three real VAR links, and excludes
- * the two goals with no VAR (nearest is 380s away). Do not widen past ~200s
- * without re-running tests/verify/precision.test.ts.
+ * the two goals with no VAR (nearest is 380s away).
+ *
+ * NOTE: widening this alone no longer fails the suite — `causallyOrdered` now
+ * independently rejects the corpus's nastiest case (18213979 goal Id 410, whose
+ * discard precedes the review). That redundancy is deliberate, but it means a green
+ * suite is NOT evidence that widening this is safe. Verify against the feed, not
+ * against the tests.
  */
 const VAR_CONTEXT_SEC = 180
 
@@ -222,7 +227,10 @@ function describeWindow(tl: Timeline, claim: Claim): string {
   ])
   const actions = [
     ...new Set(
-      framesInClockWindow(tl, claim.clockStart, claim.clockEnd)
+      // Effective, not raw. This text's whole job is telling a sponsor what IS in
+      // the window; naming an event the feed moved out of it is a false statement,
+      // even in a rejection reason.
+      framesInEffectiveClockWindow(tl, claim.clockStart, claim.clockEnd)
         .map((f) => f.action)
         .filter((a) => !NOISE.has(a)),
     ),

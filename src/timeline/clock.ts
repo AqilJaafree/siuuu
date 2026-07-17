@@ -5,11 +5,36 @@ function usableClockFrames(tl: Timeline): Frame[] {
   return tl.frames.filter((f) => f.clock !== null && !CLOCK_EXCLUDED_ACTIONS.has(f.action))
 }
 
-/** Frames whose match clock falls inside [clockStart, clockEnd]. */
+/**
+ * A frame's clock AFTER any action_amend correction.
+ *
+ * Frame.clock is what the feed first said; the amend index holds what it later
+ * corrected that to. Anything reasoning about "when did this happen" must use this,
+ * not the raw value — reporting a clock TXLine retracted is a false statement even
+ * when it only reaches explanatory text.
+ */
+export function effectiveClock(tl: Timeline, f: Frame): number | null {
+  if (f.clock === null) return null
+  return tl.amendIndex.get(`${f.action}|${f.clock}`) ?? f.clock
+}
+
+/** Frames whose match clock falls inside [clockStart, clockEnd]. Raw clocks. */
 export function framesInClockWindow(tl: Timeline, clockStart: number, clockEnd: number): Frame[] {
   return usableClockFrames(tl).filter((f) => {
     const c = f.clock as number
     return c >= clockStart && c <= clockEnd
+  })
+}
+
+/** As framesInClockWindow, but honouring amend corrections. */
+export function framesInEffectiveClockWindow(
+  tl: Timeline,
+  clockStart: number,
+  clockEnd: number,
+): Frame[] {
+  return usableClockFrames(tl).filter((f) => {
+    const c = effectiveClock(tl, f)
+    return c !== null && c >= clockStart && c <= clockEnd
   })
 }
 

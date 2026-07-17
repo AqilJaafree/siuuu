@@ -1949,10 +1949,15 @@ describe('PRECISION: a review cannot have caused a discard that already happened
   it('every real VAR overturn has its discard AFTER the var_end', () => {
     // The causal invariant the guard encodes. If a future fixture violates it, the
     // model is wrong and this should fail loudly rather than silently reject.
-    for (const [fixtureId, varEnd, goalId] of [[18237038, 571, 570], [18213979, 492, 490]] as const) {
+    for (const [fixtureId, varEnd, subjectId] of [
+      [18237038, 571, 570],  // Goal/Overturned
+      [18213979, 492, 490],  // Goal/Overturned
+      [18213979, 843, 842],  // Penalty/Overturned
+      [18222446, 611, 608],  // MistakenIdentity/Overturned -> the wrong-player card
+    ] as const) {
       const t = tl(fixtureId)
       const d = varDecisions(t).find((x) => x.eventId === varEnd)!
-      const discard = resolveEvent(t, goalId)!.frames.find((f) => f.action === 'action_discarded')!
+      const discard = resolveEvent(t, subjectId)!.frames.find((f) => f.action === 'action_discarded')!
       expect(discard.seq).toBeGreaterThan(d.seqEnd)
     }
   })

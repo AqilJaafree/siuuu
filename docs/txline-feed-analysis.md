@@ -162,7 +162,7 @@ Filter these out. They carry no moment.
 | `var` | 10 | VAR review opened. `Data.Type` names the subject once confirmed. Unconfirmed frame carries `PossibleEvent:{VAR:true}`. **See §4.1 — this is the product.** |
 | `var_end` | 5 | Review closed. `Data.Outcome` holds the decision. |
 | `action_discarded` | 30 | An event was retracted. Shares `Id` with the event it kills. **Not a referee decision by itself — see §4.1.** |
-| `action_amend` | 21 | An event was rewritten. `Data` carries `{Action, New:{...}}` — the corrected values. |
+| `action_amend` | 21 | An event was rewritten. **Joins by payload, NOT by `Id`** — `Data` carries `{Action, Previous, New}` and the amend has its own fresh `Id`. See §5. |
 | `score_adjustment` | 3 | Scoreline corrected out-of-band. `Clock.Seconds` is `0` on these. |
 | `unreliable_yellow_cards` | 4 | Operator flags card data as untrustworthy. **Must gate verification.** |
 
@@ -290,11 +290,43 @@ penalty confirmed → outcome. A 200-second referee decision, fully timestamped,
 
 - **Verify only against `Confirmed: true` frames.** An unconfirmed frame is a claim,
   not a fact.
-- **Always check for a later `action_discarded` / `action_amend` with the same `Id`.**
-  A confirmed goal can still be killed. Verification must be evaluated against the
-  *final* state of the timeline, not the first matching frame.
+- **Always check for a later retraction or correction.** A confirmed goal can still
+  be killed. Verification must be evaluated against the *final* state of the
+  timeline, not the first matching frame. **But the two mechanisms join
+  differently — see below.**
 - `Confirmed` is absent on some actions (`action_discarded`, `score_adjustment`,
   `comment`). Treat absence as "not applicable", not as `false`.
+
+### `action_discarded` and `action_amend` do NOT join the same way
+
+This is a trap, and an earlier version of this document walked into it by saying
+"check for a later `action_discarded` / `action_amend` **with the same `Id`**".
+That is right for one and wrong for the other.
+
+| | joins by | corpus |
+|---|---|---|
+| `action_discarded` | **shared `Id`** with its target | works |
+| `action_amend` | **payload** — `Data.Action` + `Data.Previous` | **0 of 21 share their target's `Id`** |
+
+An amend carries its **own fresh `Id`** and names its target by content:
+
+```json
+{ "Action": "action_amend", "Id": 460, "Seq": 518,
+  "Data": { "Action": "yellow_card",
+            "Previous": { "Clock": { "Seconds": 518 }, "PlayerId": 182068 },
+            "New":      { "Clock": { "Seconds": 479 }, "PlayerId": 182068 } } }
+```
+
+`Id: 460` is the amend's own id. The yellow card it corrects is **`Id: 113`**. Join
+on `Id` and the correction silently never applies — the timeline keeps reporting
+clock 518 for a card TXLine moved to 479, and any proof built from it states a
+value the source of record retracted.
+
+**Join amends on `(Data.Action, Data.Previous.Clock)` and apply `Data.New`.** The
+tell that you got this wrong: an "amended" field that is always null.
+
+`Data.Previous` also carries `PlayerId`, so an amend can correct *who* was carded,
+not only when — relevant once player-level attribution matters.
 
 ---
 
@@ -564,6 +596,9 @@ Sources: [France 0-2 Spain, ESPN](https://www.espn.com/soccer/match/_/gameId/760
 5. **Verify against the final timeline state.** `action_discarded` and
    `action_amend` can retract or rewrite an event minutes later. A verification
    computed at ingest can be wrong by full time. Re-evaluate on `game_finalised`.
+   **They join differently**: the discard shares its target's `Id`; the amend does
+   not (0 of 21) and must be joined on `(Data.Action, Data.Previous.Clock)`. Getting
+   this wrong means reporting a clock the feed retracted. See §5.
 6. **The odds feed prices impact, not virality.** 1X2 probability TVD is objective
    and instant, but a VAR overturn that changes nothing scores ~0. Controversy must
    be scored separately from the VAR taxonomy. Filter to `MarketPeriod === null`

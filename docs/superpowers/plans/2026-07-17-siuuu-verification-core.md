@@ -612,6 +612,15 @@ export interface Timeline {
   /** eventId -> every frame sharing it, seq ascending. */
   byEventId: Map<number, Frame[]>
   coverage: Coverage
+  /**
+   * `${targetAction}|${previousClock}` -> corrected clock.
+   *
+   * `action_amend` does NOT share its target's `Id` — 0 of 21 in the corpus do. It
+   * carries its own fresh `Id` and names its target by payload (`Data.Action` +
+   * `Data.Previous`). Joining on `Id` means amendments are silently never applied,
+   * and the timeline reports a clock the feed explicitly retracted.
+   */
+  amendIndex: Map<string, number>
 }
 
 export interface VarDecision {
@@ -634,9 +643,10 @@ export interface EventState {
   confirmed: boolean
   /** true if an action_discarded shares this id. */
   discarded: boolean
-  /** The action_amend frame, if any. */
-  amended: Frame | null
+  /** Effective clock, AFTER any action_amend correction. */
   clock: number | null
+  /** The clock TXLine first reported, if an amend moved it. Null when unamended. */
+  amendedFrom: number | null
   participant: 1 | 2 | null
   frames: Frame[]
 }
@@ -872,6 +882,35 @@ function computeCoverage(frames: Frame[]): Coverage {
   return { minClock: clocks[0], maxClock: clocks[clocks.length - 1], maxGapSec: maxGap }
 }
 
+/**
+ * Index amendments by what they target, NOT by event id.
+ *
+ * An `action_amend` frame looks like:
+ *   { Action: 'action_amend', Id: 460, Seq: 518,
+ *     Data: { Action: 'yellow_card',
+ *             Previous: { Clock: { Seconds: 518 }, PlayerId: 182068 },
+ *             New:      { Clock: { Seconds: 479 }, PlayerId: 182068 } } }
+ *
+ * Note `Id: 460` is the AMEND's own id — the yellow card it corrects is `Id: 113`.
+ * 0 of 21 amends in the corpus share their target's id, so an id-join never fires.
+ */
+function buildAmendIndex(frames: Frame[]): Map<string, number> {
+  const index = new Map<string, number>()
+  for (const f of frames) {
+    if (f.action !== 'action_amend') continue
+    const data = f.data as Record<string, unknown>
+    const targetAction = data['Action']
+    const prev = data['Previous'] as { Clock?: { Seconds?: number } } | undefined
+    const next = data['New'] as { Clock?: { Seconds?: number } } | undefined
+    const prevClock = prev?.Clock?.Seconds
+    const newClock = next?.Clock?.Seconds
+    if (typeof targetAction !== 'string') continue
+    if (typeof prevClock !== 'number' || typeof newClock !== 'number') continue
+    index.set(`${targetAction}|${prevClock}`, newClock)
+  }
+  return index
+}
+
 export function buildTimeline(fixtureId: number, frames: Frame[]): Timeline {
   const sorted = [...frames].sort((a, b) => a.seq - b.seq)
   const byEventId = new Map<number, Frame[]>()
@@ -881,7 +920,13 @@ export function buildTimeline(fixtureId: number, frames: Frame[]): Timeline {
     if (arr) arr.push(f)
     else byEventId.set(f.eventId, [f])
   }
-  return { fixtureId, frames: sorted, byEventId, coverage: computeCoverage(sorted) }
+  return {
+    fixtureId,
+    frames: sorted,
+    byEventId,
+    coverage: computeCoverage(sorted),
+    amendIndex: buildAmendIndex(sorted),
+  }
 }
 
 export interface TimelineOptions {
@@ -977,12 +1022,29 @@ describe('resolveEvent', () => {
     expect(e.confirmed).toBe(true) // it WAS confirmed, then killed — both facts matter
   })
 
-  it('captures action_amend', () => {
+  it('applies action_amend, which does NOT share its target id', () => {
+    // Real corpus shape: the amend carries its OWN id (460) and names the yellow
+    // card it corrects (id 113) by payload. 0 of 21 amends share their target id,
+    // so an id-join silently never fires and the retracted clock survives.
     const tl = buildTimeline(1, [
-      normalizeScoreFrame(raw({ Seq: 1, Id: 5, Action: 'shot', Confirmed: true })),
-      normalizeScoreFrame(raw({ Seq: 2, Id: 5, Action: 'action_amend', Data: { Action: 'shot', New: {} } })),
+      normalizeScoreFrame(raw({ Seq: 1, Id: 113, Action: 'yellow_card', Confirmed: true, Clock: { Running: true, Seconds: 518 } })),
+      normalizeScoreFrame(raw({ Seq: 2, Id: 460, Action: 'action_amend', Data: {
+        Action: 'yellow_card',
+        Previous: { Clock: { Running: true, Seconds: 518 }, PlayerId: 182068 },
+        New: { Clock: { Running: true, Seconds: 479 }, PlayerId: 182068 },
+      } })),
     ])
-    expect(resolveEvent(tl, 5)!.amended).not.toBeNull()
+    const e = resolveEvent(tl, 113)!
+    expect(e.clock).toBe(479)       // the corrected value
+    expect(e.amendedFrom).toBe(518) // the value TXLine retracted, kept for the proof
+  })
+
+  it('leaves an unamended event alone', () => {
+    const tl = buildTimeline(1, [
+      normalizeScoreFrame(raw({ Seq: 1, Id: 5, Confirmed: true, Clock: { Running: true, Seconds: 100 } })),
+    ])
+    expect(resolveEvent(tl, 5)!.clock).toBe(100)
+    expect(resolveEvent(tl, 5)!.amendedFrom).toBeNull()
   })
 
   it('returns null for an unknown event id', () => {
@@ -1065,14 +1127,20 @@ export function resolveEvent(tl: Timeline, eventId: number): EventState | null {
   for (const f of primary) if (!actions.includes(f.action)) actions.push(f.action)
 
   const withClock = primary.find((f) => f.clock !== null)
+  const rawClock = withClock?.clock ?? null
+
+  // Apply any correction. TXLine retracting a clock and us reporting the retracted
+  // value anyway is exactly the kind of false statement this product cannot make.
+  const corrected =
+    rawClock === null ? undefined : tl.amendIndex.get(`${actions[0]}|${rawClock}`)
 
   return {
     eventId,
     actions,
     confirmed: primary.some((f) => f.confirmed === true),
     discarded: frames.some((f) => f.action === 'action_discarded'),
-    amended: frames.find((f) => f.action === 'action_amend') ?? null,
-    clock: withClock?.clock ?? null,
+    clock: corrected ?? rawClock,
+    amendedFrom: corrected === undefined ? null : rawClock,
     participant: primary.find((f) => f.participant !== null)?.participant ?? null,
     frames,
   }

@@ -56,6 +56,48 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
   })
 })
 
+describe('PRECISION: a bare VAR pair proves nothing — EVERY handler', () => {
+  // The bug class, not the bug. It was first found in var_overturned_goal; review
+  // then found the identical hole in mistaken_identity and var_overturned_penalty.
+  // One test per handler, each using the "clip with no subject in it" shape.
+
+  it('mistaken_identity: a clip of the goal that STOOD (18222446 Id 595 @4010)', () => {
+    // The MistakenIdentity VAR at 4180 is 170s later and concerns a CARD, not this
+    // goal. Without a subject tie, this clip publishes a goal that counted as
+    // "VAR found mistaken identity and overturned it".
+    const r = verify(tl(18222446), claim(18222446, 4000, 4030, 'mistaken_identity'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).toMatch(/different incident/i)
+  })
+
+  it('mistaken_identity: that same clip DOES verify as a clean confirmed goal', () => {
+    const r = verify(tl(18222446), claim(18222446, 4000, 4030, 'goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].eventId).toBe(595)
+  })
+
+  it('var_overturned_penalty: a clip containing no penalty at all (18213979 @6110)', () => {
+    // 40s after the review closed. Penalty Id 842 @5929 is far outside the window.
+    const r = verify(tl(18213979), claim(18213979, 6110, 6140, 'var_overturned_penalty'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('var_stands: a clip long after the reviewed penalty resolved (18209181 @1700)', () => {
+    // VAR 300 @1550-1582 does not overlap, and penalty 296 @1472 is not in the clip.
+    const r = verify(tl(18209181), claim(18209181, 1700, 1730, 'var_stands'))
+    expect(r.status).toBe('REJECTED')
+  })
+
+  it('a Stands review still verifies when the clip SHOWS the review', () => {
+    // The subject (penalty 296 @1472) sits 78s BEFORE this clip and is never
+    // discarded — a review that stands kills nothing. Requiring a discarded
+    // subject in-clip would wrongly reject this. The clip shows the review itself.
+    const r = verify(tl(18209181), claim(18209181, 1540, 1590, 'var_stands'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].varOutcome).toBe('Stands')
+  })
+})
+
 describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', () => {
   // The mirror of the discard-without-VAR trap, and just as fatal.
   // 18237038 holds a goal that STOOD (Id 551 @3455, Confirmed, never discarded)
@@ -65,7 +107,9 @@ describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', 
   it('18237038: a clip of the goal that STOOD must NOT verify as a VAR overturn', () => {
     const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'var_overturned_goal'))
     expect(r.status).toBe('REJECTED')
-    expect(r.reason).toMatch(/different goal/i)
+    // The shared resolver says "different incident" — it generalises across goals,
+    // penalties and cards. Same assertion strength as the old /different goal/.
+    expect(r.reason).toMatch(/different incident/i)
   })
 
   it('18237038: that same clip DOES verify as a clean confirmed goal', () => {

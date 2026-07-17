@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "verify": "tsx src/cli/verify.ts",
-    "replay": "tsx src/replay/server.ts"
+    "replay": "tsx src/replay/server.ts",
+    "precompute": "tsx scripts/precompute-proofs.ts"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",

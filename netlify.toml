@@ -1,0 +1,51 @@
+# Netlify deploy config for SIUUU.
+#
+# THE THING THAT WILL BREAK IF YOU CHANGE THIS
+#
+# The app verifies against `exact-match-txline-raw/` — a 91MB capture that is
+# gitignored and therefore NOT in this repo, NOT in the Netlify build, and NOT on
+# any deploy target. `loadFixture` does readFileSync on it. Without the precompute
+# step below, the site builds green and then throws ENOENT on every card: broken in
+# the worst possible way, because it looks fine until a judge taps something.
+#
+# `precompute` runs the real verifier against the real corpus on YOUR machine (or
+# any box that has it) and writes src/generated/demo-proofs.json. That is not a
+# mock: the verifier and both scorers are pure, and proofHash is canonical, so a
+# card computed at build time is byte-identical to one computed per-request. It
+# also fails the build if the REJECTED case ever disappears — a feed that only says
+# yes is not this product.
+#
+# So: commit src/generated/demo-proofs.json. It is build output, but it is the only
+# way the deployed site has anything true to show.
+
+[build]
+  command = "npm run precompute && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # Next.js telemetry off — nothing about this build is interesting to anyone.
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Next.js on Netlify needs this plugin for SSR/route handlers.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Sponsor logos and any static art are immutable — hash-named or hand-placed.
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[context.production.environment]
+  SIUUU_NETWORK = "devnet"
+
+[context.deploy-preview.environment]
+  SIUUU_NETWORK = "devnet"

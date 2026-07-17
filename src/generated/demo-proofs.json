@@ -1,0 +1,145 @@
+{
+  "generatedFrom": "exact-match-txline-raw",
+  "cards": [
+    {
+      "fixtureId": 18222446,
+      "clockStart": 4260,
+      "clockEnd": 4290,
+      "status": "VERIFIED",
+      "claimKind": "mistaken_identity",
+      "matchedEvents": [
+        {
+          "eventId": 611,
+          "action": "var_end",
+          "clock": 4180,
+          "seq": 681,
+          "confirmed": true,
+          "varType": "MistakenIdentity",
+          "varOutcome": "Overturned"
+        }
+      ],
+      "seqRange": [
+        681,
+        681
+      ],
+      "contentHash": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "impact": 22,
+      "controversy": 100,
+      "reason": "VAR reviewed a MistakenIdentity and Overturned it, at clock 4180-4272.",
+      "validation": {
+        "tier": "FEED_ATTESTED",
+        "statKey": null,
+        "seq": 681,
+        "network": "devnet"
+      },
+      "hash": "67e2603e6b47b8b0aac7a23a4d80efce200e7857a30368d548b474c6352865f4",
+      "impactEvidence": "1X2 [0.32,0.54,0.14] -> [0.46,0.47,0.07]  TVD 0.140  suspended 0s",
+      "controversyEvidence": "var(MistakenIdentity) + Overturned",
+      "title": "Referee cards the wrong player — VAR overrules",
+      "note": "Argentina QF · the only red card in the tournament capture"
+    },
+    {
+      "fixtureId": 18237038,
+      "clockStart": 3625,
+      "clockEnd": 3655,
+      "status": "VERIFIED",
+      "claimKind": "var_overturned_goal",
+      "matchedEvents": [
+        {
+          "eventId": 571,
+          "action": "var_end",
+          "clock": 3641,
+          "seq": 640,
+          "confirmed": true,
+          "varType": "Goal",
+          "varOutcome": "Overturned"
+        },
+        {
+          "eventId": 570,
+          "action": "goal",
+          "clock": 3629,
+          "seq": 638,
+          "confirmed": false
+        }
+      ],
+      "seqRange": [
+        638,
+        640
+      ],
+      "contentHash": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "impact": 1,
+      "controversy": 90,
+      "reason": "VAR reviewed a Goal and Overturned it, at clock 3641-3653.",
+      "validation": {
+        "tier": "FEED_ATTESTED",
+        "statKey": null,
+        "seq": 638,
+        "network": "devnet"
+      },
+      "hash": "238679c80ed98a3117e1dbed0886907e3e1b457cc7b3a1ab40112bba42ff7ec0",
+      "impactEvidence": "1X2 [0.03,0.10,0.86] -> [0.03,0.10,0.87]  TVD 0.004  suspended 0s",
+      "controversyEvidence": "var(Goal) + Overturned",
+      "title": "Spain goal overturned by VAR",
+      "note": "France 0-2 Spain, semi-final · the market did not move"
+    },
+    {
+      "fixtureId": 18209181,
+      "clockStart": 3910,
+      "clockEnd": 3940,
+      "status": "VERIFIED",
+      "claimKind": "goal",
+      "matchedEvents": [
+        {
+          "eventId": 729,
+          "action": "goal",
+          "clock": 3922,
+          "seq": 793,
+          "confirmed": true
+        }
+      ],
+      "seqRange": [
+        793,
+        793
+      ],
+      "contentHash": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "impact": 19,
+      "controversy": 10,
+      "reason": "Confirmed goal at clock 3922.",
+      "validation": {
+        "tier": "FEED_ATTESTED",
+        "statKey": null,
+        "seq": 793,
+        "network": "devnet"
+      },
+      "hash": "b0f1e8fa464142f5ba4ad4bd9912e59b7f038b188227ec244ecbea4fc78b695f",
+      "impactEvidence": "1X2 [0.86,0.12,0.02] -> [0.98,0.02,0.00]  TVD 0.119  suspended 0s",
+      "controversyEvidence": "goal · Seq 793",
+      "title": "France second goal",
+      "note": "France 2-0 Morocco, QF · the real clip we OCR tested"
+    },
+    {
+      "fixtureId": 18209181,
+      "clockStart": 2910,
+      "clockEnd": 2940,
+      "status": "REJECTED",
+      "claimKind": "var_overturned_goal",
+      "matchedEvents": [],
+      "seqRange": null,
+      "contentHash": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "impact": 5,
+      "controversy": 0,
+      "reason": "No VAR decision of type Goal with outcome Overturned within 180s. A discarded goal alone does not prove VAR. TXLine has: goal, action_discarded, shot, free_kick, possible",
+      "validation": {
+        "tier": "FEED_ATTESTED",
+        "statKey": null,
+        "seq": -1,
+        "network": "devnet"
+      },
+      "hash": "768b790de22dabf53c0a92830764cf2a1a422f3157a92ca93ed8f4d3448e9b5d",
+      "impactEvidence": "1X2 [0.62,0.28,0.10] -> [0.58,0.30,0.11]  TVD 0.034  suspended 0s",
+      "controversyEvidence": null,
+      "title": "Morocco goal ruled out — was it VAR?",
+      "note": "THE PRODUCT. A goal was withdrawn here, but no VAR backs it, so SIUUU refuses to claim VAR."
+    }
+  ]
+}

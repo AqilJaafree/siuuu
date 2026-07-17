@@ -26,17 +26,56 @@
       "impact": 22,
       "controversy": 100,
       "reason": "VAR reviewed a MistakenIdentity and Overturned it, at clock 4180-4272.",
+      "sponsor": null,
       "validation": {
         "tier": "FEED_ATTESTED",
         "statKey": null,
         "seq": 681,
         "network": "devnet"
       },
-      "hash": "67e2603e6b47b8b0aac7a23a4d80efce200e7857a30368d548b474c6352865f4",
+      "hash": "cf2df98c7d073c99314fc7018d2b342f044e3cf4afafab6d07dd396113a9a6a7",
       "impactEvidence": "1X2 [0.32,0.54,0.14] -> [0.46,0.47,0.07]  TVD 0.140  suspended 0s",
       "controversyEvidence": "var(MistakenIdentity) + Overturned",
       "title": "Referee cards the wrong player — VAR overrules",
       "note": "Argentina QF · the only red card in the tournament capture"
+    },
+    {
+      "fixtureId": 18222446,
+      "clockStart": 4265,
+      "clockEnd": 4295,
+      "status": "VERIFIED",
+      "claimKind": "red_card",
+      "matchedEvents": [
+        {
+          "eventId": 613,
+          "action": "red_card",
+          "clock": 4280,
+          "seq": 686,
+          "confirmed": true
+        }
+      ],
+      "seqRange": [
+        686,
+        686
+      ],
+      "contentHash": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "impact": 22,
+      "controversy": 70,
+      "reason": "Confirmed red card at clock 4280.",
+      "sponsor": null,
+      "validation": {
+        "tier": "MERKLE_PROVEN",
+        "statKey": 6,
+        "seq": 687,
+        "network": "devnet",
+        "verifiedOnChain": true,
+        "rootsPda": "FtnZq4V8mp56GUNEGGXfL1MuyT81cvoz59yeKn192HdH"
+      },
+      "hash": "f7a8a947a6481e7d8729e55fe4807a9e87d7fd9fac76998f43650588b6d71d26",
+      "impactEvidence": "1X2 [0.32,0.54,0.14] -> [0.46,0.47,0.07]  TVD 0.140  suspended 0s",
+      "controversyEvidence": "red_card · Seq 686",
+      "title": "The red card itself — proven on Solana",
+      "note": "Argentina QF · statKey 6, proven against daily_scores_roots. The VAR reason next to it cannot be."
     },
     {
       "fixtureId": 18237038,
@@ -70,13 +109,14 @@
       "impact": 1,
       "controversy": 90,
       "reason": "VAR reviewed a Goal and Overturned it, at clock 3641-3653.",
+      "sponsor": null,
       "validation": {
         "tier": "FEED_ATTESTED",
         "statKey": null,
         "seq": 638,
         "network": "devnet"
       },
-      "hash": "238679c80ed98a3117e1dbed0886907e3e1b457cc7b3a1ab40112bba42ff7ec0",
+      "hash": "0daa448d939e639ec84946764b41f5f898f76c28cc7d73622a066b0d1b0bc508",
       "impactEvidence": "1X2 [0.03,0.10,0.86] -> [0.03,0.10,0.87]  TVD 0.004  suspended 0s",
       "controversyEvidence": "var(Goal) + Overturned",
       "title": "Spain goal overturned by VAR",
@@ -105,13 +145,16 @@
       "impact": 19,
       "controversy": 10,
       "reason": "Confirmed goal at clock 3922.",
+      "sponsor": null,
       "validation": {
-        "tier": "FEED_ATTESTED",
-        "statKey": null,
+        "tier": "MERKLE_PROVEN",
+        "statKey": 1,
         "seq": 793,
-        "network": "devnet"
+        "network": "devnet",
+        "verifiedOnChain": true,
+        "rootsPda": "EUCbk9vftUek4vChr6rnXP9hhR8UuHGBDJKLsAQTZ9Zr"
       },
-      "hash": "b0f1e8fa464142f5ba4ad4bd9912e59b7f038b188227ec244ecbea4fc78b695f",
+      "hash": "d6a9953e6f6353a93944e95018009f47769bad011b49744c05253ebd334e6794",
       "impactEvidence": "1X2 [0.86,0.12,0.02] -> [0.98,0.02,0.00]  TVD 0.119  suspended 0s",
       "controversyEvidence": "goal · Seq 793",
       "title": "France second goal",
@@ -129,13 +172,14 @@
       "impact": 5,
       "controversy": 0,
       "reason": "No VAR decision of type Goal with outcome Overturned within 180s. A discarded goal alone does not prove VAR. TXLine has: goal, action_discarded, shot, free_kick, possible",
+      "sponsor": null,
       "validation": {
         "tier": "FEED_ATTESTED",
         "statKey": null,
         "seq": -1,
         "network": "devnet"
       },
-      "hash": "768b790de22dabf53c0a92830764cf2a1a422f3157a92ca93ed8f4d3448e9b5d",
+      "hash": "1aec2d58373feae2824a16f8b8349867b2038633bae4a832320c5ade1c65b579",
       "impactEvidence": "1X2 [0.62,0.28,0.10] -> [0.58,0.30,0.11]  TVD 0.034  suspended 0s",
       "controversyEvidence": null,
       "title": "Morocco goal ruled out — was it VAR?",

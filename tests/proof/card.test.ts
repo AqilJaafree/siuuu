@@ -16,6 +16,7 @@ const card = (): ProofCard => ({
   impact: 22,
   controversy: 100,
   reason: 'VAR found mistaken identity and Overturned it at clock 4180-4272.',
+  sponsor: null,
   validation: { tier: 'FEED_ATTESTED', statKey: null, seq: 668, network: 'devnet' },
 })
 
@@ -69,6 +70,7 @@ describe('buildProofCard', () => {
       },
       impact: 22,
       controversy: 100,
+      sponsor: null,
       validation: { tier: 'FEED_ATTESTED', statKey: null, seq: 668, network: 'devnet' },
     })
     expect(c.status).toBe('VERIFIED')
@@ -81,7 +83,7 @@ describe('buildProofCard', () => {
 describe('ProofCard v2 — proof tier', () => {
   const base = {
     fixtureId: 18222446, clockStart: 4260, clockEnd: 4290,
-    contentHash: 'a'.repeat(64), impact: 22, controversy: 100,
+    contentHash: 'a'.repeat(64), impact: 22, controversy: 100, sponsor: null,
     result: { status: 'VERIFIED' as const, reason: 'ok', matchedEvents: [], seqRange: [687, 687] as [number, number] },
   }
 
@@ -115,5 +117,53 @@ describe('ProofCard v2 — proof tier', () => {
     const notYet = buildProofCard({ ...base, claimKind: 'red_card',
       validation: { tier: 'MERKLE_PROVEN', statKey: 6, seq: 687, network: 'devnet' } })
     expect(proofHash(claimed)).not.toBe(proofHash(notYet))
+  })
+
+  it('binds the roots PDA into the hash — the card commits to what it was proven against', () => {
+    const a = buildProofCard({ ...base, claimKind: 'red_card',
+      validation: { tier: 'MERKLE_PROVEN', statKey: 6, seq: 687, network: 'devnet', verifiedOnChain: true, rootsPda: 'FtnZq4V8mp56GUNEGGXfL1MuyT81cvoz59yeKn192HdH' } })
+    const b = buildProofCard({ ...base, claimKind: 'red_card',
+      validation: { tier: 'MERKLE_PROVEN', statKey: 6, seq: 687, network: 'devnet', verifiedOnChain: true, rootsPda: 'EUCbk9vftUek4vChr6rnXP9hhR8UuHGBDJKLsAQTZ9Zr' } })
+    expect(proofHash(a)).not.toBe(proofHash(b))
+  })
+})
+
+describe('ProofCard v3 — the sponsor rides inside the hash', () => {
+  const base = {
+    fixtureId: 18222446, clockStart: 4260, clockEnd: 4290, claimKind: 'red_card' as const,
+    contentHash: 'a'.repeat(64), impact: 22, controversy: 70,
+    validation: { tier: 'FEED_ATTESTED' as const, statKey: null, seq: 686, network: 'devnet' as const },
+  }
+  const verified = { status: 'VERIFIED' as const, reason: 'ok', matchedEvents: [], seqRange: [686, 686] as [number, number] }
+  const rejected = { status: 'REJECTED' as const, reason: 'no backing event', matchedEvents: [], seqRange: null }
+
+  it('carries the sponsor on a verified card', () => {
+    expect(buildProofCard({ ...base, result: verified, sponsor: 'adidas' }).sponsor).toBe('adidas')
+  })
+
+  it('changes the hash — a sponsor swapped after the fact cannot keep the same proof', () => {
+    // The product's core promise. If the sponsor sat outside the hash, the same proof
+    // would validate a card with anyone's logo on it.
+    const adidas = buildProofCard({ ...base, result: verified, sponsor: 'adidas' })
+    const nike = buildProofCard({ ...base, result: verified, sponsor: 'nike' })
+    const none = buildProofCard({ ...base, result: verified, sponsor: null })
+    expect(proofHash(adidas)).not.toBe(proofHash(nike))
+    expect(proofHash(adidas)).not.toBe(proofHash(none))
+    expect(proofHash(nike)).not.toBe(proofHash(none))
+  })
+
+  it('NEVER attaches a sponsor to a REJECTED card — the whole thesis', () => {
+    // "The sponsor's logo cannot appear on a clip that isn't true." Enforced where
+    // every card is built, not left to each caller to remember.
+    const c = buildProofCard({ ...base, result: rejected, sponsor: 'adidas' })
+    expect(c.sponsor).toBeNull()
+  })
+
+  it('a rejected card hashes identically whichever sponsor was requested', () => {
+    // The corollary: since no sponsor survives rejection, no brand can be smuggled
+    // into a refused claim's hash either.
+    const a = buildProofCard({ ...base, result: rejected, sponsor: 'adidas' })
+    const b = buildProofCard({ ...base, result: rejected, sponsor: 'nike' })
+    expect(proofHash(a)).toBe(proofHash(b))
   })
 })

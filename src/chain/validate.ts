@@ -98,21 +98,34 @@ export async function loadProgram(
   return new anchor.Program(JSON.parse(readFileSync(idlPath, 'utf8')), provider)
 }
 
+export interface ProofOutcome {
+  /** What the program returned. `false` is a real answer, not an error. */
+  valid: boolean
+  /** The daily_scores_roots PDA the proof was checked against. */
+  rootsPda: string
+  /** The stat value the feed put in the tree at this seq — what the proof is about. */
+  statValue: number
+  /** The stat's timestamp, which selects the roots bucket. */
+  minTimestamp: number
+}
+
 /**
- * Prove a stat against `daily_scores_roots` on-chain. Read-only via `.view()`.
+ * Prove a stat against `daily_scores_roots` on-chain, and report WHAT was proven.
  *
- * Needs a raised compute budget — 1_400_000. Without it the simulation runs out and
- * fails in a way that looks like an invalid proof (skill §13.5).
+ * Read-only via `.view()`. Needs a raised compute budget — 1_400_000. Without it the
+ * simulation runs out and fails in a way that looks like an invalid proof (skill
+ * §13.5), which would be the worst kind of wrong: an honest claim rejected by a
+ * misconfiguration.
  */
-export async function validateStatOnChain(
+export async function proveStatOnChain(
   args: ValidateArgs,
   deps: { program: anchor.Program; fetchValidation: (a: ValidateArgs) => Promise<any> },
-): Promise<boolean> {
+): Promise<ProofOutcome> {
   const v = await deps.fetchValidation(args)
   const shaped = shapeValidation(v)
   const dailyScoresPda = pdas(args.network).dailyScoresRoots(epochDayOf(shaped.minTimestamp))
 
-  return deps.program.methods
+  const valid: boolean = await deps.program.methods
     .validateStat(
       new BN(shaped.minTimestamp),
       shaped.fixtureSummary,
@@ -126,4 +139,19 @@ export async function validateStatOnChain(
     .accounts({ dailyScoresMerkleRoots: dailyScoresPda })
     .preInstructions([ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 })])
     .view()
+
+  return {
+    valid,
+    rootsPda: dailyScoresPda.toBase58(),
+    statValue: v.statToProve?.value ?? 0,
+    minTimestamp: shaped.minTimestamp,
+  }
+}
+
+/** Boolean-only form. The predicate either held against the chain or it did not. */
+export async function validateStatOnChain(
+  args: ValidateArgs,
+  deps: { program: anchor.Program; fetchValidation: (a: ValidateArgs) => Promise<any> },
+): Promise<boolean> {
+  return (await proveStatOnChain(args, deps)).valid
 }

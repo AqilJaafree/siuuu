@@ -4,7 +4,9 @@ import { tsWindowForClock } from '../timeline/clock.js'
 import { verify } from '../verify/verifier.js'
 import { impactScore } from '../score/impact.js'
 import { controversyScore, controversyEvidence, GOAL_WITHDRAWN_SCORE } from '../score/controversy.js'
-import { buildProofCard, proofHash, type ProofCard } from '../proof/card.js'
+import { buildProofCard, proofHash, type ProofCard, type Validation } from '../proof/card.js'
+import { lookupProven, type ProvenStat } from '../chain/proven.js'
+import { PROVEN_STATS } from '../generated/proven-stats.js'
 import type { ClaimKind } from '../verify/types.js'
 
 const CLAIM_KINDS: ClaimKind[] = [
@@ -17,6 +19,25 @@ export interface CliArgs {
   clockStart: number
   clockEnd: number
   claimKind: ClaimKind
+  /**
+   * The sponsor riding on this claim, or null.
+   *
+   * Inside the canonical serialisation, therefore inside the hash. That is the whole
+   * promise: the sponsor's logo cannot appear on a clip that isn't true, and a
+   * sponsor swapped after the fact produces a different hash.
+   */
+  sponsor?: string | null
+}
+
+export interface RunOpts {
+  /**
+   * The proof ledger to consult. Defaults to the committed one.
+   *
+   * Injectable so `precompute --prove` can build a card against a proof it has just
+   * run, and so tests can state a ledger outright instead of depending on whichever
+   * proofs happen to be baked in today.
+   */
+  provenStats?: readonly ProvenStat[]
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -40,7 +61,11 @@ export function parseArgs(argv: string[]): CliArgs {
     throw new Error(`--claim must be one of: ${CLAIM_KINDS.join(', ')}`)
   }
 
-  return { fixtureId, clockStart, clockEnd, claimKind: claim as ClaimKind }
+  // Optional: a claim with no sponsor is the normal case, not a missing argument.
+  const si = argv.indexOf('--sponsor')
+  const sponsor = si === -1 || si + 1 >= argv.length ? null : argv[si + 1]
+
+  return { fixtureId, clockStart, clockEnd, claimKind: claim as ClaimKind, sponsor }
 }
 
 export interface VerifiedCard extends ProofCard {
@@ -57,7 +82,7 @@ export interface VerifiedCard extends ProofCard {
   controversyEvidence: string | null
 }
 
-export function runVerify(args: CliArgs): VerifiedCard {
+export function runVerify(args: CliArgs, opts: RunOpts = {}): VerifiedCard {
   const cap = loadFixture(CORPUS_ROOT, args.fixtureId)
   const tl = timelineFromCapture(cap, { mergeHistorical: true })
 
@@ -84,6 +109,39 @@ export function runVerify(args: CliArgs): VerifiedCard {
     ? 'goal withdrawn · no VAR behind it'
     : controversyEvidence(result.matchedEvents)
 
+  // MERKLE_PROVEN requires a proof that RAN — an entry in the ledger, written only
+  // when validateStat returned true against live devnet (see chain/proven.ts). A
+  // statKey merely EXISTING for this claim kind earns nothing: deriving the tier from
+  // that would assert a proof we never performed. Absent an entry, the card is a read
+  // of TxODDS's capture and says exactly that.
+  const proven =
+    result.status === 'VERIFIED'
+      ? lookupProven(opts.provenStats ?? PROVEN_STATS, {
+          fixtureId: args.fixtureId,
+          clockStart: args.clockStart,
+          clockEnd: args.clockEnd,
+          claimKind: args.claimKind,
+        })
+      : null
+
+  const validation: Validation = proven
+    ? {
+        tier: 'MERKLE_PROVEN',
+        statKey: proven.statKey,
+        // The seq the proof was actually checked at — not the evidence window's first
+        // seq, which is a different fact and would misstate what was proven.
+        seq: proven.seq,
+        network: proven.network,
+        verifiedOnChain: true,
+        rootsPda: proven.rootsPda,
+      }
+    : {
+        tier: 'FEED_ATTESTED',
+        statKey: null,
+        seq: result.seqRange?.[0] ?? -1,
+        network: 'devnet',
+      }
+
   const card = buildProofCard({
     fixtureId: args.fixtureId,
     clockStart: args.clockStart,
@@ -94,15 +152,8 @@ export function runVerify(args: CliArgs): VerifiedCard {
     result,
     impact: impact?.score ?? 0,
     controversy,
-    // FEED_ATTESTED, always, until `--prove` actually calls validateStat. This card
-    // is a read of TxODDS's corpus capture and nothing more. Deriving MERKLE_PROVEN
-    // from "a statKey exists for this claim" would assert a proof we never ran.
-    validation: {
-      tier: 'FEED_ATTESTED',
-      statKey: null,
-      seq: result.seqRange?.[0] ?? -1,
-      network: 'devnet',
-    },
+    sponsor: args.sponsor ?? null,
+    validation,
   })
 
   return {

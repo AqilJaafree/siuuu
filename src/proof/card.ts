@@ -49,6 +49,18 @@ export interface ProofCard {
   controversy: number
   reason: string
   /**
+   * The sponsor riding on this claim, or null.
+   *
+   * INSIDE the canonical serialisation, and therefore inside the hash. This is the
+   * product's core promise: the card commits to which sponsor rides on it, so a
+   * sponsor swapped after the fact produces a different hash and the swap is
+   * detectable. A sponsor outside the hash would be a logo anyone could move onto any
+   * clip.
+   *
+   * Always null on a REJECTED card — `buildProofCard` enforces it.
+   */
+  sponsor: string | null
+  /**
    * What the claim is actually backed by. Required, and inside the canonical
    * serialisation — the tier is bound into the hash, so a card cannot be silently
    * upgraded from attested to proven after the fact.
@@ -89,6 +101,8 @@ export interface BuildProofCardInput {
   result: VerifyResult
   impact: number
   controversy: number
+  /** Explicit and required. There is no default sponsor — null means none. */
+  sponsor: string | null
   /** Explicit and required. There is no default tier — guessing one would overclaim. */
   validation: Validation
 }
@@ -106,6 +120,12 @@ export function buildProofCard(input: BuildProofCardInput): ProofCard {
     impact: input.impact,
     controversy: input.controversy,
     reason: input.result.reason,
+    // The thesis, enforced at the one place every card is built rather than left to
+    // each caller to remember: a refused claim carries no sponsor. The clip still
+    // posts — with the refusal attached — but no brand rides on a claim the feed does
+    // not back. Dropped rather than thrown: rejection is a normal outcome of posting,
+    // not a programming error.
+    sponsor: input.result.status === 'REJECTED' ? null : input.sponsor,
     validation: input.validation,
   }
 }

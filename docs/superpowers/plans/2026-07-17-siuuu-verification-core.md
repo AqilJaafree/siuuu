@@ -892,7 +892,8 @@ function computeCoverage(frames: Frame[]): Coverage {
  *             New:      { Clock: { Seconds: 479 }, PlayerId: 182068 } } }
  *
  * Note `Id: 460` is the AMEND's own id — the yellow card it corrects is `Id: 113`.
- * 0 of 21 amends in the corpus share their target's id, so an id-join never fires.
+ * 0 of 23 amends in the corpus share their target's id, so an id-join never fires.
+ * (23 with historical merged; 21 on the live stream alone.)
  */
 function buildAmendIndex(frames: Frame[]): Map<string, number> {
   const index = new Map<string, number>()
@@ -906,6 +907,13 @@ function buildAmendIndex(frames: Frame[]): Map<string, number> {
     const newClock = next?.Clock?.Seconds
     if (typeof targetAction !== 'string') continue
     if (typeof prevClock !== 'number' || typeof newClock !== 'number') continue
+    // Only 1 of 23 amends actually moves a clock. The other 22 repeat Clock.Seconds
+    // unchanged while correcting a DIFFERENT field (Outcome OnTarget->OffTarget,
+    // FreeKickType, PlayerId). Indexing those would make `corrected !== undefined`
+    // for events whose clock was never touched, so `amendedFrom` would assert
+    // "TXLine retracted this clock" about 22 events it never retracted — the exact
+    // false-statement class this index exists to close.
+    if (prevClock === newClock) continue
     index.set(`${targetAction}|${prevClock}`, newClock)
   }
   return index
@@ -1024,7 +1032,7 @@ describe('resolveEvent', () => {
 
   it('applies action_amend, which does NOT share its target id', () => {
     // Real corpus shape: the amend carries its OWN id (460) and names the yellow
-    // card it corrects (id 113) by payload. 0 of 21 amends share their target id,
+    // card it corrects (id 113) by payload. 0 of 23 amends share their target id,
     // so an id-join silently never fires and the retracted clock survives.
     const tl = buildTimeline(1, [
       normalizeScoreFrame(raw({ Seq: 1, Id: 113, Action: 'yellow_card', Confirmed: true, Clock: { Running: true, Seconds: 518 } })),

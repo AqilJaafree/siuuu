@@ -487,7 +487,7 @@ describe.skipIf(!process.env.SIUUU_API_TOKEN)('validateStat (live)', () => {
 
 ```ts
 import * as anchor from '@coral-xyz/anchor'
-import { BN } from '@coral-xyz/anchor'
+import BN from 'bn.js' // NOT from '@coral-xyz/anchor' — throws under ESM. Needs @types/bn.js.
 import { ComputeBudgetProgram } from '@solana/web3.js'
 import { pdas, epochDayOf, type Network } from './config.js'
 
@@ -601,9 +601,9 @@ describe('ProofCard v2 — proof tier', () => {
 
   it('marks a Merkle-proven claim as PROVEN and records the statKey', () => {
     const c = buildProofCard({ ...base, claimKind: 'red_card',
-      validation: { tier: 'MERKLE_PROVEN', statKey: 2006, seq: 687, network: 'mainnet' } })
+      validation: { tier: 'MERKLE_PROVEN', statKey: 6, seq: 687, network: 'mainnet' } })
     expect(c.validation.tier).toBe('MERKLE_PROVEN')
-    expect(c.validation.statKey).toBe(2006)
+    expect(c.validation.statKey).toBe(6) // TOTAL key — 2006 is empty, see Task 2
   })
 
   it('marks a VAR claim as FEED_ATTESTED with no statKey', () => {
@@ -617,9 +617,9 @@ describe('ProofCard v2 — proof tier', () => {
 
   it('the tier changes the hash — a card cannot be silently upgraded', () => {
     const proven = buildProofCard({ ...base, claimKind: 'red_card',
-      validation: { tier: 'MERKLE_PROVEN', statKey: 2006, seq: 687, network: 'mainnet' } })
+      validation: { tier: 'MERKLE_PROVEN', statKey: 6, seq: 687, network: 'mainnet' } })
     const attested = buildProofCard({ ...base, claimKind: 'red_card',
-      validation: { tier: 'FEED_ATTESTED', statKey: 2006, seq: 687, network: 'mainnet' } })
+      validation: { tier: 'FEED_ATTESTED', statKey: 6, seq: 687, network: 'mainnet' } })
     expect(proofHash(proven)).not.toBe(proofHash(attested))
   })
 })

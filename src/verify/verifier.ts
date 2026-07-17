@@ -129,6 +129,7 @@ export function verify(tl: Timeline, claim: Claim): VerifyResult {
 
   const handlers: Record<ClaimKind, () => VerifyResult> = {
     var_overturned_goal: () => {
+      // Both directions must hold. Either alone states something false.
       const d = varInContext(tl, claim, (x) => x.type === 'Goal' && x.outcome === 'Overturned')
       if (!d) {
         return no(
@@ -136,11 +137,33 @@ export function verify(tl: Timeline, claim: Claim): VerifyResult {
             `A discarded goal alone does not prove VAR. ${describeWindow(tl, claim)}`,
         )
       }
-      const matched = [varMatch(d)]
-      // Corroboration: a goal discarded near the review.
-      const goal = eventsWithAction(tl, claim, 'goal').find((e) => e.discarded)
-      if (goal) matched.push(eventMatch(goal))
-      return ok(`VAR reviewed a Goal and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`, matched)
+
+      // A VAR pair alone is NOT enough — it may have overturned a DIFFERENT goal.
+      // 18237038 holds both: Id 551 @3455 is Confirmed and STOOD (one of Spain's
+      // two goals), while Id 570 @3629 is the goal VAR killed, 186s later. With
+      // the VAR pair as sole evidence, a clip of the goal that STOOD verifies as
+      // "VAR overturned this goal" — telling the world a legitimate goal was
+      // disallowed. Require a discarded goal in the window AND tie it temporally
+      // to the review.
+      const goal = eventsWithAction(tl, claim, 'goal').find(
+        (e) =>
+          e.discarded &&
+          e.clock !== null &&
+          d.clockStart !== null &&
+          Math.abs(e.clock - d.clockStart) <= VAR_CONTEXT_SEC,
+      )
+      if (!goal) {
+        return no(
+          `A VAR Goal/Overturned decision exists at clock ${d.clockStart}, but no discarded ` +
+            `goal in this window is tied to it — the review may have overturned a different ` +
+            `goal. ${describeWindow(tl, claim)}`,
+        )
+      }
+
+      return ok(
+        `VAR reviewed a Goal and Overturned it at clock ${d.clockStart}-${d.clockEnd}.`,
+        [varMatch(d), eventMatch(goal)],
+      )
     },
 
     var_overturned_penalty: () => {

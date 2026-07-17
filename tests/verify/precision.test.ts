@@ -56,6 +56,33 @@ describe('PRECISION: goals withdrawn with NO VAR must NOT verify as a VAR overtu
   })
 })
 
+describe('PRECISION: a VAR pair alone does not prove THIS goal was overturned', () => {
+  // The mirror of the discard-without-VAR trap, and just as fatal.
+  // 18237038 holds a goal that STOOD (Id 551 @3455, Confirmed, never discarded)
+  // and a goal VAR killed (Id 570 @3629), 186s apart. A clip of the FORMER sits
+  // within ±180s of the VAR at 3641. Matching on the VAR pair alone tells the
+  // world Spain's legitimate goal was disallowed.
+  it('18237038: a clip of the goal that STOOD must NOT verify as a VAR overturn', () => {
+    const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'var_overturned_goal'))
+    expect(r.status).toBe('REJECTED')
+    expect(r.reason).toMatch(/different goal/i)
+  })
+
+  it('18237038: that same clip DOES verify as a clean confirmed goal', () => {
+    const r = verify(tl(18237038), claim(18237038, 3440, 3470, 'goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents[0].eventId).toBe(551)
+  })
+
+  it('a verified VAR overturn always NAMES the goal it killed', () => {
+    // Evidence must contain the goal, not just the review. An evidence array with
+    // no goal in it is how the bug above hid.
+    const r = verify(tl(18237038), claim(18237038, 3625, 3655, 'var_overturned_goal'))
+    expect(r.status).toBe('VERIFIED')
+    expect(r.matchedEvents.some((e) => e.eventId === 570)).toBe(true)
+  })
+})
+
 describe('PRECISION: outcome must match — Stands is not Overturned', () => {
   it('18209181 Id 300 is Penalty/Stands — REJECTED as var_overturned_penalty', () => {
     expect(verify(tl(18209181), claim(18209181, 1540, 1590, 'var_overturned_penalty')).status).toBe('REJECTED')

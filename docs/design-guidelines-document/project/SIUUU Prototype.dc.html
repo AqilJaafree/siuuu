@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#e7e4dd;font-family:'Inter',system-ui,sans-serif;display:flex;justify-content:center;padding:28px 0}
+  .disp{font-family:'Archivo Black',sans-serif;text-transform:uppercase;line-height:.95}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  .lbl{font:700 10px/1 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.08em}
+  .ph{background:repeating-linear-gradient(45deg,#e9e6df 0 9px,#f4f2ec 9px 18px);display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.4);font:400 11px 'JetBrains Mono',monospace;text-align:center}
+  .phd{background:repeating-linear-gradient(45deg,#1c1c1c 0 9px,#242424 9px 18px);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);font:400 11px 'JetBrains Mono',monospace;text-align:center}
+  .pill{border:2px solid #111;border-radius:999px;padding:5px 11px;font:700 10.5px 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:#111;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
+  .row{display:flex}.col{display:flex;flex-direction:column}
+  .sunk{background:#F0EDE6;border:3px solid #111}
+  i[data-lucide]{width:22px;height:22px;stroke-width:2.5px;display:block}
+  .navitem i[data-lucide]{width:24px;height:24px}
+  .rail{width:46px;height:46px;border:2px solid #fff;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font:700 10px 'Inter',sans-serif;cursor:pointer;transition:transform 90ms ease-out}
+  .rail:active{transform:translate(2px,2px)}
+  .btn{border:2px solid #111;box-shadow:4px 4px 0 #111;font-weight:700;cursor:pointer;transition:transform 90ms ease-out,box-shadow 90ms ease-out;display:flex;align-items:center;justify-content:center}
+  .btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #111}
+  .inp{border:3px solid #111;background:#fff;font:400 13px 'Inter',sans-serif;padding:11px 12px;width:100%;border-radius:0;outline:none}
+  .inp:focus{outline:3px solid #FF006E;outline-offset:2px}
+  .chip{border:2px solid #6D3BFF;box-shadow:3px 3px 0 #6D3BFF;padding:8px 11px;font:700 11px 'Inter',sans-serif;background:#FDFBF7;color:#111;cursor:pointer}
+  .chip.on{background:#6D3BFF;color:#fff}
+  .navitem{background:none;border:none;font:700 11px 'Inter',sans-serif;color:rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:0}
+  .navitem.on{color:#111}
+  @keyframes snapin{from{transform:scale(.85)}to{transform:scale(1)}}
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</helmet>
+
+<div class="col" style="width:360px;border:2px solid #111;border-radius:40px;padding:10px;background:#fff;box-shadow:10px 10px 0 #111">
+  <div class="col" style="border:2px solid #111;border-radius:30px;overflow:hidden;background:#FDFBF7;height:720px;position:relative">
+
+    <!-- ===================== HOME ===================== -->
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+    <div class="col" style="flex:1;min-height:0;position:relative;overflow:hidden">
+      <div class="row" style="position:absolute;top:0;left:0;right:0;z-index:5;justify-content:space-between;align-items:center;padding:16px 16px">
+        <span class="disp" style="font-size:22px;color:#fff;letter-spacing:-.5px;text-shadow:2px 2px 0 rgba(0,0,0,.5)">SIUUU</span>
+        <span class="btn" style="background:#FDFBF7;padding:6px 14px;font-size:11px;box-shadow:3px 3px 0 rgba(0,0,0,.4)">LOGIN</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;scroll-snap-type:y mandatory">
+        <sc-for list="{{ feed }}" as="clip" hint-placeholder-count="2">
+        <div class="phd" style="height:653px;scroll-snap-align:start;position:relative">
+          {{ clip.videoLabel }}
+          <span class="pill" onClick="{{ clip.onProof }}" style="position:absolute;top:58px;left:16px;background:{{ clip.statusColor }}">{{ clip.status }}</span>
+          <div class="row" style="position:absolute;top:58px;right:16px;gap:6px">
+            <span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">{{ clip.impact }}</span>
+            <span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">{{ clip.controv }}</span>
+          </div>
+          <div class="col" style="position:absolute;right:14px;bottom:120px;gap:15px;align-items:center">
+            <div class="col" style="align-items:center;gap:4px"><button class="rail" onClick="{{ clip.onLike }}" style="background:{{ clip.likeBg }}"><i data-lucide="heart"></i></button><span class="mono" style="font-size:9px;color:#fff">{{ clip.likeLabel }}</span></div>
+            <div class="col" style="align-items:center;gap:4px"><button class="rail"><i data-lucide="message-square"></i></button><span class="mono" style="font-size:9px;color:#fff">{{ clip.replies }}</span></div>
+            <div class="col" style="align-items:center;gap:4px"><button class="rail" onClick="{{ clip.onProof }}" style="background:#FF4D00;color:#111;border-color:#111">PROOF</button></div>
+            <div class="col" style="align-items:center;gap:4px"><button class="rail"><i data-lucide="share-2"></i></button><span class="mono" style="font-size:9px;color:#fff">share</span></div>
+          </div>
+          <div class="col" style="position:absolute;left:16px;right:80px;bottom:26px;gap:6px">
+            <span style="color:#fff;font-weight:700;font-size:15px;line-height:1.25">{{ clip.title }}</span>
+            <span class="mono" style="font-size:10px;color:rgba(255,255,255,.8)">{{ clip.metaLine }}</span>
+          </div>
+        </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===================== CLIP / UPLOAD ===================== -->
+    <sc-if value="{{ isClip }}" hint-placeholder-val="{{ true }}">
+    <div class="col" style="flex:1;min-height:0;overflow:hidden">
+      <div class="row" style="justify-content:space-between;align-items:center;padding:16px;border-bottom:3px solid #111">
+        <span class="disp" style="font-size:22px;letter-spacing:-.5px">SIUUU</span>
+        <span class="lbl" style="font-size:12px">NEW CLIP</span>
+      </div>
+
+      <sc-if value="{{ verifying }}" hint-placeholder-val="{{ false }}">
+      <div class="col" style="flex:1;padding:16px;gap:12px">
+        <div class="row" style="align-items:center;gap:10px"><i data-lucide="shield-check"></i><span class="lbl" style="font-size:13px">VERIFYING CLIP</span></div>
+        <div class="row" style="gap:5px">
+          <sc-for list="{{ segs }}" as="s" hint-placeholder-count="6"><div style="flex:1;height:12px;border:2px solid #111;background:{{ s.bg }}"></div></sc-for>
+        </div>
+        <div class="col" style="margin-top:4px">
+          <sc-for list="{{ vsteps }}" as="st" hint-placeholder-count="6">
+          <div class="row" style="align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(0,0,0,.1);opacity:{{ st.opacity }};background:{{ st.rowBg }}">
+            <span class="mono" style="width:20px;font-weight:700">{{ st.n }}</span>
+            <span style="flex:1;font-weight:700;font-size:12px">{{ st.name }}</span>
+            <span class="pill" style="background:{{ st.badgeBg }};font-size:8px;padding:4px 8px;cursor:default">{{ st.badge }}</span>
+          </div>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ notVerifying }}" hint-placeholder-val="{{ true }}">
+      <div class="col" style="flex:1;padding:16px;gap:14px;overflow-y:auto">
+        <button class="ph" onClick="{{ onPickFile }}" style="border:3px solid #111;height:190px;flex-direction:column;gap:8px;cursor:pointer;background:{{ fileBg }}">
+          <span class="disp" style="font-size:26px;color:rgba(0,0,0,.55)">{{ fileLabel }}</span>
+          <span class="mono" style="font-size:10px">{{ fileHint }}</span>
+        </button>
+        <div class="col" style="gap:5px"><span class="lbl" style="color:rgba(0,0,0,.5)">TITLE</span><input class="inp" value="{{ draftTitle }}" onChange="{{ onTitle }}" placeholder="Phantom equaliser, 24:32"></div>
+        <div class="col" style="gap:5px"><span class="lbl" style="color:rgba(0,0,0,.5)">DESCRIPTION</span><textarea class="inp" rows="2" value="{{ draftDesc }}" onChange="{{ onDesc }}" placeholder="what the ref actually saw…"></textarea></div>
+        <div class="col" style="gap:7px"><span class="lbl" style="color:#6D3BFF">SPONSOR CAMPAIGN</span>
+          <div class="row" style="gap:8px">
+            <sc-for list="{{ sponsors }}" as="sp" hint-placeholder-count="3"><button class="chip" onClick="{{ sp.onPick }}" style="{{ sp.style }}">{{ sp.name }}</button></sc-for>
+          </div>
+        </div>
+      </div>
+      <div class="col" style="padding:14px 16px;border-top:3px solid #111">
+        <button class="btn" onClick="{{ onPost }}" style="background:#111;color:#FDFBF7;height:50px;box-shadow:4px 4px 0 #6D3BFF"><span class="lbl" style="font-size:14px;color:#FDFBF7">POST</span></button>
+      </div>
+      </sc-if>
+    </div>
+    </sc-if>
+
+    <!-- ===================== PROFILE ===================== -->
+    <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+    <div class="col" style="flex:1;min-height:0;overflow:hidden">
+      <div class="row" style="justify-content:space-between;align-items:center;padding:16px;border-bottom:3px solid #111">
+        <span class="disp" style="font-size:22px;letter-spacing:-.5px">SIUUU</span>
+        <span class="btn" style="background:#FDFBF7;padding:6px 14px;font-size:11px">LOGIN</span>
+      </div>
+      <div class="col" style="flex:1;padding:18px 16px;gap:16px;overflow-y:auto">
+        <div class="col" style="align-items:center;gap:8px">
+          <div class="ph" style="width:78px;height:78px;border:3px solid #111;border-radius:999px">avatar</div>
+          <span style="font-weight:700;font-size:15px">@clipper</span>
+          <div class="row" style="border:2px solid #111;box-shadow:3px 3px 0 #111">
+            <div class="col" style="align-items:center;padding:6px 14px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:14px">{{ clipCount }}</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">CLIPS</span></div>
+            <div class="col" style="align-items:center;padding:6px 14px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:14px;color:#00a83c">{{ verifiedCount }}</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">VERIFIED</span></div>
+            <div class="col" style="align-items:center;padding:6px 14px"><span class="mono" style="font-weight:700;font-size:14px;color:#FF006E">4.2k</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">IMPACT</span></div>
+          </div>
+        </div>
+        <div class="col" style="gap:6px"><span class="lbl" style="color:#6D3BFF">ENGAGED SPONSORS</span>
+          <div class="row" style="gap:8px">
+            <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF">S1</div>
+            <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF">S2</div>
+            <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF">S3</div>
+            <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF">S4</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <sc-for list="{{ feed }}" as="clip" hint-placeholder-count="2">
+          <button class="col" onClick="{{ clip.onProof }}" style="border:3px solid #111;box-shadow:4px 4px 0 #111;background:#fff;padding:0;cursor:pointer;text-align:left">
+            <div class="ph" style="height:110px;border-bottom:3px solid #111;position:relative;width:100%"><span class="pill" style="position:absolute;top:6px;left:6px;background:{{ clip.statusColor }};font-size:8px;padding:2px 7px;cursor:pointer">{{ clip.status }}</span></div>
+            <div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">{{ clip.impact }}</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">{{ clip.controv }}</span></div>
+          </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ===================== BOTTOM NAV ===================== -->
+    <div class="row" style="flex:none;justify-content:space-around;align-items:center;padding:12px 8px 14px;border-top:3px solid #111;background:#FDFBF7">
+      <button class="navitem {{ homeCls }}" onClick="{{ goHome }}"><i data-lucide="home"></i>Home</button>
+      <button class="navitem {{ clipCls }}" onClick="{{ goClip }}"><i data-lucide="plus-square"></i>Clip</button>
+      <button class="navitem {{ profileCls }}" onClick="{{ goProfile }}"><i data-lucide="user"></i>Profile</button>
+    </div>
+
+    <!-- ===================== PROOF SHEET ===================== -->
+    <div style="position:absolute;left:0;right:0;bottom:0;top:0;z-index:20;pointer-events:{{ proofPointer }}">
+      <div onClick="{{ closeProof }}" style="position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:{{ proofScrimOpacity }};transition:opacity 160ms ease-out"></div>
+      <div class="col" style="position:absolute;left:0;right:0;bottom:0;max-height:88%;background:#FDFBF7;border-top:5px solid #111;transform:translateY({{ proofY }});transition:transform 160ms ease-out;overflow-y:auto">
+        <sc-if value="{{ hasProof }}" hint-placeholder-val="{{ false }}">
+        <div class="col" style="padding:18px;gap:14px">
+          <div class="row" style="justify-content:space-between;align-items:flex-start">
+            <span class="pill" style="background:{{ proof.statusColor }};font-size:12px;padding:7px 14px;cursor:default">{{ proof.status }}</span>
+            <button class="btn" onClick="{{ closeProof }}" style="background:#FDFBF7;width:34px;height:34px;box-shadow:2px 2px 0 #111">✕</button>
+          </div>
+          <div class="col" style="gap:3px"><span class="lbl" style="color:rgba(0,0,0,.5)">MATCH · TIME</span><span class="mono" style="font-size:14px;font-weight:700">{{ proof.window }}</span></div>
+
+          <div class="col" style="gap:6px"><span class="lbl" style="color:rgba(0,0,0,.5)">MATCH FEED</span>
+            <div class="sunk col" style="padding:0">
+              <div class="row" style="padding:7px 10px;border-bottom:2px solid #111;gap:8px"><span class="mono" style="flex:1;font-size:9px;font-weight:700">ID</span><span class="mono" style="width:78px;font-size:9px;font-weight:700">ACTION</span><span class="mono" style="width:44px;font-size:9px;font-weight:700">CLOCK</span><span class="mono" style="width:34px;font-size:9px;font-weight:700">SEQ</span></div>
+              <sc-for list="{{ proof.events }}" as="ev" hint-placeholder-count="2">
+              <div class="row" style="padding:7px 10px;border-bottom:1px solid rgba(0,0,0,.12);gap:8px"><span class="mono" style="flex:1;font-size:10px">{{ ev.id }}</span><span class="mono" style="width:78px;font-size:10px">{{ ev.action }}</span><span class="mono" style="width:44px;font-size:10px">{{ ev.clock }}</span><span class="mono" style="width:34px;font-size:10px">{{ ev.seq }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="row" style="gap:12px">
+            <div class="col" style="flex:1;border:3px solid #111;padding:10px"><span class="lbl" style="color:rgba(0,0,0,.5);font-size:8px">IMPACT</span><span class="disp" style="font-size:34px;color:#FF006E">{{ proof.impact }}</span><span class="mono" style="font-size:8px;color:rgba(0,0,0,.6);line-height:1.35">{{ proof.impactMath }}</span></div>
+            <div class="col" style="flex:1;border:3px solid #111;padding:10px"><span class="lbl" style="color:rgba(0,0,0,.5);font-size:8px">CONTROVERSY</span><span class="disp" style="font-size:34px;color:#FF4D00">{{ proof.controv }}</span><span class="mono" style="font-size:8px;color:rgba(0,0,0,.6);line-height:1.35">{{ proof.controvMath }}</span></div>
+          </div>
+
+          <div class="col" style="gap:5px"><span class="lbl" style="color:rgba(0,0,0,.5)">READ CONFIDENCE · {{ proof.ocr }}%</span><div style="height:16px;border:2px solid #111;background:#fff"><div style="height:100%;width:{{ proof.ocrW }};background:#111"></div></div></div>
+
+          <div class="col" style="gap:6px"><span class="lbl" style="color:rgba(0,0,0,.5)">ANCHORED ON SOLANA</span>
+            <div class="sunk row" style="padding:9px 10px;align-items:center;gap:8px"><i data-lucide="link"></i><span class="mono" style="flex:1;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ proof.sig }}</span><button class="btn" onClick="{{ onCopy }}" style="background:#FDFBF7;padding:5px 8px;font-size:9px;box-shadow:2px 2px 0 #111">{{ copyLabel }}</button></div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:400,&quot;height&quot;:800}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: 'home',
+      clips: this.seedClips(),
+      liked: {},
+      proofId: null,
+      draftTitle: '', draftDesc: '', draftSponsor: null, file: false,
+      verifying: false, vstep: 0,
+      copied: false,
+    };
+  }
+  seedClips() {
+    return [
+      { id: 'c1', title: 'France 2–2 Spain — the phantom equaliser', videoLabel: 'VIDEO', status: 'OVERTURNED', statusColor: '#FF4D00',
+        impact: 1, controv: 90, likes: 12300, replies: 840, metaLine: '24:32 · goal → action_discarded · Seq 534',
+        window: '18209181 · 24:32–25:58', ocr: 82,
+        events: [ {id:'ev_8f2', action:'goal', clock:'24:32', seq:'534'}, {id:'ev_a13', action:'var_start', clock:'25:10', seq:'548'}, {id:'ev_c90', action:'action_discarded', clock:'25:58', seq:'561'} ],
+        impactMath: '[0.52,0.37,0.11] → [0.50,0.38,0.12]  TVD 0.02', controvMath: 'var(MistakenIdentity) + Overturned',
+        sig: '4pQr…u9Kx2Lm…devnet' },
+      { id: 'c2', title: 'Late winner, 90+4', videoLabel: 'VIDEO', status: 'VERIFIED', statusColor: '#00E054',
+        impact: 78, controv: 12, likes: 9100, replies: 320, metaLine: '94:11 · goal confirmed · Seq 1204',
+        window: '18209181 · 93:58–94:20', ocr: 96,
+        events: [ {id:'ev_f01', action:'goal', clock:'94:11', seq:'1204'}, {id:'ev_f07', action:'goal_confirmed', clock:'94:14', seq:'1209'} ],
+        impactMath: '[0.44,0.31,0.25] → [0.87,0.09,0.04]  TVD 0.43', controvMath: 'clean goal · no review',
+        sig: '9Zk3…mR4p7Qw…devnet' },
+      { id: 'c3', title: 'Penalty saved, 83:20', videoLabel: 'VIDEO', status: 'VERIFIED', statusColor: '#00E054',
+        impact: 55, controv: 8, likes: 6400, replies: 190, metaLine: '83:20 · pen_miss · Seq 991',
+        window: '18209181 · 83:05–83:30', ocr: 91,
+        events: [ {id:'ev_p12', action:'penalty', clock:'83:12', seq:'980'}, {id:'ev_p18', action:'pen_miss', clock:'83:20', seq:'991'} ],
+        impactMath: '[0.30,0.40,0.30] → [0.28,0.42,0.30]  TVD 0.02', controvMath: 'save · no dispute',
+        sig: 'Ax7Q…nB2v8Tc…devnet' },
+    ];
+  }
+  vdefs() {
+    return [
+      { n: '1', name: 'Reading the clip' },
+      { n: '2', name: 'Finding the moment' },
+      { n: '3', name: 'Checking the feed' },
+      { n: '4', name: 'Scoring the drama' },
+      { n: '5', name: 'Building the proof' },
+      { n: '6', name: 'Publishing' },
+    ];
+  }
+  componentDidMount() { this.icons(); }
+  componentDidUpdate() { this.icons(); }
+  componentWillUnmount() { clearInterval(this._t); }
+  icons() { if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 120); }
+
+  post() {
+    if (this.state.verifying) return;
+    this.setState({ verifying: true, vstep: 1 });
+    this._t = setInterval(() => {
+      this.setState((s) => {
+        if (s.vstep >= 7) { clearInterval(this._t); return this.finalize(s); }
+        return { vstep: s.vstep + 1 };
+      });
+    }, 720);
+  }
+  finalize(s) {
+    const title = (s.draftTitle || 'New verified clip').trim();
+    const clip = { id: 'u' + Date.now(), title, videoLabel: 'VIDEO', status: 'VERIFIED', statusColor: '#00E054',
+      impact: 63, controv: 9, likes: 0, replies: 0, metaLine: '61:08 · goal confirmed · Seq 812',
+      window: '18209181 · 60:55–61:20', ocr: 88,
+      events: [ {id:'ev_n01', action:'goal', clock:'61:08', seq:'812'}, {id:'ev_n06', action:'goal_confirmed', clock:'61:11', seq:'817'} ],
+      impactMath: '[0.41,0.33,0.26] → [0.79,0.14,0.07]  TVD 0.38', controvMath: 'clean goal · no review',
+      sig: 'Nw5T…kP8m3Rd…devnet' };
+    return { verifying: false, vstep: 0, tab: 'home', draftTitle: '', draftDesc: '', draftSponsor: null, file: false,
+      clips: [clip, ...s.clips] };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const feed = s.clips.map((c) => {
+      const liked = !!s.liked[c.id];
+      const likeCount = c.likes + (liked ? 1 : 0);
+      return { ...c,
+        likeBg: liked ? '#FF006E' : 'rgba(0,0,0,.35)',
+        likeLabel: likeCount >= 1000 ? (likeCount / 1000).toFixed(1) + 'k' : String(likeCount),
+        replies: c.replies >= 1000 ? (c.replies / 1000).toFixed(1) + 'k' : String(c.replies),
+        onLike: () => this.setState((st) => ({ liked: { ...st.liked, [c.id]: !st.liked[c.id] } })),
+        onProof: () => this.setState({ proofId: c.id }),
+      };
+    });
+    const proof = s.clips.find((c) => c.id === s.proofId) || null;
+
+    const cur = s.vstep;
+    const vsteps = this.vdefs().map((d, idx) => {
+      const i = idx + 1;
+      const st = i < cur ? 'done' : (i === cur ? 'run' : 'wait');
+      return { ...d,
+        badge: st === 'done' ? 'DONE' : (st === 'run' ? 'RUNNING' : 'WAITING'),
+        badgeBg: st === 'done' ? '#00E054' : (st === 'run' ? '#FFD600' : '#E5E5E5'),
+        opacity: st === 'wait' ? '0.4' : '1',
+        rowBg: st === 'run' ? '#F0EDE6' : 'transparent',
+      };
+    });
+    const segs = [1,2,3,4,5,6].map((i) => ({ bg: i < cur ? '#00E054' : (i === cur ? '#FFD600' : '#E5E5E5') }));
+
+    const sponsorNames = ['Nexo', 'Pol.', 'Coinbase'];
+    const sponsors = sponsorNames.map((name, i) => ({ name,
+      style: s.draftSponsor === i ? 'background:#6D3BFF;color:#fff' : '',
+      onPick: () => this.setState({ draftSponsor: i }),
+    }));
+
+    return {
+      isHome: s.tab === 'home', isClip: s.tab === 'clip', isProfile: s.tab === 'profile',
+      homeCls: s.tab === 'home' ? 'on' : '', clipCls: s.tab === 'clip' ? 'on' : '', profileCls: s.tab === 'profile' ? 'on' : '',
+      goHome: () => this.setState({ tab: 'home' }), goClip: () => this.setState({ tab: 'clip' }), goProfile: () => this.setState({ tab: 'profile' }),
+      feed,
+      verifying: s.verifying, notVerifying: !s.verifying, vsteps, segs,
+      draftTitle: s.draftTitle, draftDesc: s.draftDesc,
+      onTitle: (e) => this.setState({ draftTitle: e.target.value }),
+      onDesc: (e) => this.setState({ draftDesc: e.target.value }),
+      sponsors,
+      file: s.file, fileLabel: s.file ? 'CLIP ✓' : 'UPLOAD', fileHint: s.file ? 'phantom_goal.mp4 · 00:12' : 'tap to record · or import clip',
+      fileBg: s.file ? '#eef7ef' : '',
+      onPickFile: () => this.setState({ file: true }),
+      onPost: () => this.post(),
+      clipCount: s.clips.length, verifiedCount: s.clips.filter((c) => c.status === 'VERIFIED').length,
+      hasProof: !!proof, proof: proof ? { ...proof, ocrW: proof.ocr + '%' } : {},
+      proofPointer: proof ? 'auto' : 'none',
+      proofScrimOpacity: proof ? '1' : '0',
+      proofY: proof ? '0%' : '100%',
+      closeProof: () => this.setState({ proofId: null, copied: false }),
+      onCopy: () => { try { navigator.clipboard.writeText('solana:devnet:signature'); } catch (e) {} this.setState({ copied: true }); },
+      copyLabel: s.copied ? 'COPIED' : 'COPY',
+    };
+  }
+}
+</script>
+</body>
+</html>

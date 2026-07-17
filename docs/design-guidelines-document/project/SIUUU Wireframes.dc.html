@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#e7e4dd;font-family:'Inter',system-ui,sans-serif}
+  .dv-turn{padding:48px 52px 40px;border-bottom:1px solid rgba(0,0,0,.1);scroll-margin-top:16px}
+  .dv-thd{display:flex;align-items:baseline;gap:12px;margin:0 0 8px}
+  .dv-tid{font:600 11px ui-monospace,Menlo,monospace;padding:4px 8px;background:#111;color:#fff;border-radius:4px;text-decoration:none}
+  .dv-tname{font:700 15px/1.2 'Inter',sans-serif;color:#111}
+  .dv-tsub{margin:0 0 30px;font:400 13px/1.55 'Inter',sans-serif;color:rgba(0,0,0,.55);max-width:640px}
+  .dv-opts{display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start}
+  .dv-opt{flex:none;display:flex;flex-direction:column;gap:12px;scroll-margin-top:16px}
+  .dv-olabel{display:flex;align-items:baseline;gap:10px;font:400 12.5px/1.3 'Inter',sans-serif;color:rgba(0,0,0,.6)}
+  .dv-oid{font:700 11px ui-monospace,Menlo,monospace;padding:3px 8px;background:rgba(0,0,0,.1);color:#111;border-radius:5px;text-decoration:none}
+  .dv-opt:target .dv-oid{background:#FF006E;color:#fff}
+  .dv-next{margin:32px 0 0;font:13px/1.6 'Inter',sans-serif;color:rgba(0,0,0,.5)}
+  .dv-cap{font:700 16px/1 'Caveat',cursive;color:rgba(0,0,0,.5);letter-spacing:.3px}
+  a{color:#FF006E}a:hover{color:#c8005a}
+
+  /* neobrutalist form language */
+  .disp{font-family:'Archivo Black',sans-serif;text-transform:uppercase;line-height:.95}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  .hand{font-family:'Caveat',cursive}
+  .lbl{font:700 10px/1 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.08em}
+  .ph{background:repeating-linear-gradient(45deg,#e9e6df 0 9px,#f4f2ec 9px 18px);display:flex;align-items:center;justify-content:center;color:rgba(0,0,0,.4);font:400 11px 'JetBrains Mono',monospace;text-align:center}
+  .phd{background:repeating-linear-gradient(45deg,#1c1c1c 0 9px,#242424 9px 18px);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font:400 11px 'JetBrains Mono',monospace;text-align:center}
+  .pill{border:2px solid #111;border-radius:999px;padding:5px 11px;font:700 10.5px 'Inter',sans-serif;text-transform:uppercase;letter-spacing:.05em;color:#111;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .chip{border:2px solid #111;box-shadow:3px 3px 0 #111;padding:8px 12px;font:700 12px 'Inter',sans-serif;background:#FDFBF7;color:#111}
+  .chip.on{background:#111;color:#FDFBF7}
+  .row{display:flex}.col{display:flex;flex-direction:column}
+  .sunk{background:#F0EDE6;border:3px solid #111}
+
+  /* phone device frame — bezel is a device, app content stays hard-edged */
+  .phone{width:320px;border:2px solid #111;border-radius:36px;padding:9px;background:#fff;box-shadow:8px 8px 0 #111}
+  .screen{border:2px solid #111;border-radius:26px;overflow:hidden;background:#FDFBF7;height:660px;position:relative;display:flex;flex-direction:column}
+  .nav{display:flex;justify-content:space-around;align-items:center;padding:12px 8px 14px;border-top:3px solid #111;background:#FDFBF7}
+  .navitem{font:700 12px 'Inter',sans-serif;color:rgba(0,0,0,.4);text-transform:none;display:flex;flex-direction:column;align-items:center;gap:5px}
+  .navitem .dot{width:20px;height:20px;border:2px solid rgba(0,0,0,.4)}
+  .navitem.on{color:#111}.navitem.on .dot{border-color:#111;background:#111}
+  .railbtn{width:46px;height:46px;border:2px solid #fff;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font:700 10px 'Inter',sans-serif;text-align:center}
+  i[data-lucide]{width:22px;height:22px;stroke-width:2.5px;display:block}
+  .navitem i[data-lucide]{width:22px;height:22px}
+  .icell{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 8px;border:3px solid #111;background:#fff;box-shadow:4px 4px 0 #111}
+  .icell i[data-lucide]{width:26px;height:26px;color:#111}
+  .icell .nm{font:700 10px 'JetBrains Mono',monospace;color:#111}
+  .icell .use{font:400 9px 'Inter',sans-serif;color:rgba(0,0,0,.5);text-align:center;line-height:1.3}
+  .seg{flex:1;height:14px;border:2px solid #111;background:#E5E5E5}
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</helmet>
+
+<section class="dv-turn" id="t3">
+  <div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Web / desktop layouts</span></div>
+  <p class="dv-tsub">The same three surfaces at desktop width — persistent left sidebar nav (max-width 1200, hard-aligned to the grid). Home keeps the single centered portrait player like TikTok web; Clip and Profile spread into the extra room. Same ink-on-paper, mono data, semantic colour, offset shadows.</p>
+
+  <div class="dv-opts">
+
+    <!-- 3a HOME WEB -->
+    <div class="dv-opt" id="3a">
+      <div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Home — web</div>
+      <div class="row" style="width:940px;height:600px;border:3px solid #111;box-shadow:8px 8px 0 #111;background:#FDFBF7">
+        <!-- sidebar -->
+        <div class="col" style="width:210px;border-right:3px solid #111;padding:20px 18px;gap:6px">
+          <span class="disp" style="font-size:26px;letter-spacing:-.5px;margin-bottom:20px">SIUUU</span>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;border:2px solid #111;box-shadow:3px 3px 0 #111;background:#111;color:#FDFBF7;font-weight:700;font-size:14px"><i data-lucide="home"></i>Home</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="plus-square"></i>Clip</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="user"></i>Profile</div>
+          <div style="flex:1"></div>
+          <div class="row" style="justify-content:center;align-items:center;padding:11px;border:2px solid #111;box-shadow:3px 3px 0 #111;font-weight:700;font-size:13px">LOGIN</div>
+        </div>
+        <!-- main -->
+        <div class="row" style="flex:1;align-items:center;justify-content:center;gap:22px;position:relative">
+          <div class="phd" style="width:320px;height:520px;position:relative;border:3px solid #111">
+            VIDEO
+            <span class="pill" style="position:absolute;top:14px;left:14px;background:#FF4D00;font-size:10px">OVERTURNED · TAP</span>
+            <div class="row" style="position:absolute;top:14px;right:14px;gap:6px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">1</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">90</span></div>
+            <div class="col" style="position:absolute;left:16px;right:16px;bottom:18px;gap:5px"><span style="color:#fff;font-weight:700;font-size:14px;line-height:1.25">France 2–2 Spain — the phantom equaliser</span><span class="mono" style="font-size:10px;color:rgba(255,255,255,.8)">24:32 · goal → action_discarded · Seq 534</span></div>
+          </div>
+          <div class="col" style="gap:18px;align-items:center">
+            <div class="col" style="align-items:center;gap:4px"><div class="railbtn" style="border-color:#111;background:#FDFBF7;color:#111"><i data-lucide="heart"></i></div><span class="mono" style="font-size:9px">12k</span></div>
+            <div class="col" style="align-items:center;gap:4px"><div class="railbtn" style="border-color:#111;background:#FDFBF7;color:#111"><i data-lucide="message-square"></i></div><span class="mono" style="font-size:9px">840</span></div>
+            <div class="col" style="align-items:center;gap:4px"><div class="railbtn" style="border-color:#111;background:#FF4D00;color:#111">PROOF</div><span class="mono" style="font-size:9px">open</span></div>
+            <div class="col" style="align-items:center;gap:4px"><div class="railbtn" style="border-color:#111;background:#FDFBF7;color:#111"><i data-lucide="share-2"></i></div><span class="mono" style="font-size:9px">share</span></div>
+          </div>
+          <div class="col" style="position:absolute;right:20px;top:50%;transform:translateY(-50%);gap:10px"><div class="railbtn" style="border-color:#111;background:#FDFBF7;color:#111">↑</div><div class="railbtn" style="border-color:#111;background:#FDFBF7;color:#111">↓</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3b CLIP WEB -->
+    <div class="dv-opt" id="3b">
+      <div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Clip — web</div>
+      <div class="row" style="width:940px;height:600px;border:3px solid #111;box-shadow:8px 8px 0 #111;background:#FDFBF7">
+        <div class="col" style="width:210px;border-right:3px solid #111;padding:20px 18px;gap:6px">
+          <span class="disp" style="font-size:26px;letter-spacing:-.5px;margin-bottom:20px">SIUUU</span>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="home"></i>Home</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;border:2px solid #111;box-shadow:3px 3px 0 #111;background:#111;color:#FDFBF7;font-weight:700;font-size:14px"><i data-lucide="plus-square"></i>Clip</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="user"></i>Profile</div>
+          <div style="flex:1"></div>
+          <div class="row" style="justify-content:center;align-items:center;padding:11px;border:2px solid #111;box-shadow:3px 3px 0 #111;font-weight:700;font-size:13px">LOGIN</div>
+        </div>
+        <div class="col" style="flex:1;padding:28px 32px;gap:18px">
+          <span class="disp" style="font-size:20px">NEW CLIP</span>
+          <div class="row" style="gap:22px;flex:1">
+            <div class="ph b3" style="border:3px solid #111;flex:1;flex-direction:column;gap:8px"><span class="disp" style="font-size:30px;color:rgba(0,0,0,.55)">UPLOAD</span><span class="mono" style="font-size:11px">drag a clip here · or record</span></div>
+            <div class="col" style="width:340px;gap:16px">
+              <div class="col" style="gap:6px"><span class="lbl" style="color:rgba(0,0,0,.5)">TITLE</span><div class="ph" style="border:3px solid #111;height:44px;justify-content:flex-start;padding-left:12px;background:#fff">Phantom equaliser, 24:32</div></div>
+              <div class="col" style="gap:6px"><span class="lbl" style="color:rgba(0,0,0,.5)">DESCRIPTION</span><div class="ph" style="border:3px solid #111;height:80px;justify-content:flex-start;align-items:flex-start;padding:10px 12px;background:#fff">what the ref actually saw…</div></div>
+              <div class="col" style="gap:8px"><span class="lbl" style="color:#6D3BFF">SPONSOR CAMPAIGN</span><div class="row" style="gap:8px;align-items:center"><span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span><span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span><span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span><span class="mono" style="font-size:14px;color:#6D3BFF">›</span></div></div>
+              <div class="row" style="justify-content:center;align-items:center;background:#111;color:#FDFBF7;height:50px;border:2px solid #111;box-shadow:4px 4px 0 #6D3BFF;margin-top:auto"><span class="lbl" style="font-size:13px;color:#FDFBF7">POST — START VERIFICATION</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3c PROFILE WEB -->
+    <div class="dv-opt" id="3c">
+      <div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Profile — web</div>
+      <div class="row" style="width:940px;height:600px;border:3px solid #111;box-shadow:8px 8px 0 #111;background:#FDFBF7">
+        <div class="col" style="width:210px;border-right:3px solid #111;padding:20px 18px;gap:6px">
+          <span class="disp" style="font-size:26px;letter-spacing:-.5px;margin-bottom:20px">SIUUU</span>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="home"></i>Home</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;color:rgba(0,0,0,.55);font-weight:700;font-size:14px"><i data-lucide="plus-square"></i>Clip</div>
+          <div class="row" style="align-items:center;gap:12px;padding:11px 12px;border:2px solid #111;box-shadow:3px 3px 0 #111;background:#111;color:#FDFBF7;font-weight:700;font-size:14px"><i data-lucide="user"></i>Profile</div>
+          <div style="flex:1"></div>
+          <div class="row" style="justify-content:center;align-items:center;padding:11px;border:2px solid #111;box-shadow:3px 3px 0 #111;font-weight:700;font-size:13px">LOGIN</div>
+        </div>
+        <div class="col" style="flex:1;padding:28px 32px;gap:20px;overflow:hidden">
+          <div class="row" style="gap:22px;align-items:center">
+            <div class="ph" style="width:92px;height:92px;border:3px solid #111;border-radius:999px">avatar</div>
+            <div class="col" style="gap:10px">
+              <span style="font-weight:700;font-size:20px">@clipper</span>
+              <div class="row" style="border:2px solid #111;box-shadow:3px 3px 0 #111">
+                <div class="col" style="align-items:center;padding:8px 18px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:16px">128</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">CLIPS</span></div>
+                <div class="col" style="align-items:center;padding:8px 18px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:16px;color:#00a83c">96</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">VERIFIED</span></div>
+                <div class="col" style="align-items:center;padding:8px 18px"><span class="mono" style="font-weight:700;font-size:16px;color:#FF006E">4.2k</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">IMPACT</span></div>
+              </div>
+            </div>
+            <div class="col" style="margin-left:auto;gap:6px"><span class="lbl" style="color:#6D3BFF">ENGAGED SPONSORS</span><div class="row" style="gap:8px"><div class="ph" style="width:44px;height:44px;border:2px solid #6D3BFF">S1</div><div class="ph" style="width:44px;height:44px;border:2px solid #6D3BFF">S2</div><div class="ph" style="width:44px;height:44px;border:2px solid #6D3BFF">S3</div><div class="ph" style="width:44px;height:44px;border:2px solid #6D3BFF">S4</div></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+            <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:150px;border-bottom:3px solid #111;position:relative">clip<span class="pill" style="position:absolute;top:6px;left:6px;background:#FF4D00;font-size:8px;padding:2px 7px">OVERTURNED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">1</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">90</span></div></div>
+            <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:150px;border-bottom:3px solid #111;position:relative">clip<span class="pill" style="position:absolute;top:6px;left:6px;background:#00E054;font-size:8px;padding:2px 7px">VERIFIED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">78</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">12</span></div></div>
+            <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:150px;border-bottom:3px solid #111;position:relative">clip<span class="pill" style="position:absolute;top:6px;left:6px;background:#00E054;font-size:8px;padding:2px 7px">VERIFIED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">41</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">33</span></div></div>
+            <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:150px;border-bottom:3px solid #111;position:relative">clip<span class="pill" style="position:absolute;top:6px;left:6px;background:#E5E5E5;font-size:8px;padding:2px 7px">REJECTED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="font-size:10px;color:rgba(0,0,0,.5)">no event</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Try next: "add a Proof Card modal to the web Home" · "make the web sidebar collapsible" · "desktop rankings page"</p>
+</section>
+
+<section class="dv-turn" id="t2">
+  <div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Loading animation + icon library</span></div>
+  <p class="dv-tsub">The verify loader (<a class="dv-oid" href="#2a">2a</a>) is <b>live-animating</b> — six discrete steps that each land with a hard snap, plus a segmented progress bar. No indeterminate spinner: the product demonstrates itself by showing each real step complete. <a class="dv-oid" href="#2b">2b</a> is the icon set (Lucide, chunky 2.5px stroke) now wired into Home &amp; Profile nav and the action rail — no emoji.</p>
+
+  <div class="dv-opts">
+
+    <!-- 2a ANIMATED LOADER -->
+    <div class="dv-opt" id="2a">
+      <div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Verification loader — animated (watch it snap)</div>
+      <div class="col" style="width:540px;border:5px solid #111;box-shadow:8px 8px 0 #111;background:#FDFBF7">
+        <div class="row" style="justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:3px solid #111">
+          <div class="row" style="gap:10px;align-items:center"><i data-lucide="shield-check"></i><span class="lbl" style="font-size:13px">VERIFYING CLIP</span></div>
+          <span class="mono" style="font-size:11px;color:rgba(0,0,0,.6)">18209181 · 24:32</span>
+        </div>
+        <!-- segmented progress -->
+        <div class="row" style="gap:6px;padding:16px 18px 6px">
+          <div class="seg" data-vseg="1"></div><div class="seg" data-vseg="2"></div><div class="seg" data-vseg="3"></div><div class="seg" data-vseg="4"></div><div class="seg" data-vseg="5"></div><div class="seg" data-vseg="6"></div>
+        </div>
+        <div class="row" style="padding:0 18px 8px;justify-content:space-between"><span class="mono" style="font-size:9px;color:rgba(0,0,0,.45)">discrete · no spinner</span><span class="mono" style="font-size:9px;color:rgba(0,0,0,.45)">OCR → Resolve → Match → Drama → Proof → Publish</span></div>
+        <div class="col" style="padding:6px 0 10px">
+          <div class="row" data-vstep="1" style="align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)"><i data-lucide="scan-line"></i><span style="flex:1;font-weight:700;font-size:13px">OCR — read overlay clock &amp; score</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">read “24:32 · 2–2”</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+          <div class="row" data-vstep="2" style="align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)"><i data-lucide="search"></i><span style="flex:1;font-weight:700;font-size:13px">Resolve — locate fixture window</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">24:32–25:02</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+          <div class="row" data-vstep="3" style="align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)"><i data-lucide="git-compare"></i><span style="flex:1;font-weight:700;font-size:13px">Match — query TXOdd feed</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">goal→discarded</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+          <div class="row" data-vstep="4" style="align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)"><i data-lucide="gavel"></i><span style="flex:1;font-weight:700;font-size:13px">Drama — Impact &amp; Controversy</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">1 · 90</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+          <div class="row" data-vstep="5" style="align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)"><i data-lucide="file-check"></i><span style="flex:1;font-weight:700;font-size:13px">Proof — build Proof Card</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">event table</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+          <div class="row" data-vstep="6" style="align-items:center;gap:12px;padding:12px 18px"><i data-lucide="link"></i><span style="flex:1;font-weight:700;font-size:13px">Publish — anchor on Solana, post to Home</span><span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:130px;text-align:right">devnet sig</span><span class="pill" data-vbadge style="background:#E5E5E5;font-size:9px;width:74px;justify-content:center">WAITING</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2b ICON LIBRARY -->
+    <div class="dv-opt" id="2b">
+      <div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Icon library</div>
+      <div style="width:560px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+        <div class="icell"><i data-lucide="home"></i><span class="nm">home</span><span class="use">Home tab</span></div>
+        <div class="icell"><i data-lucide="plus-square"></i><span class="nm">plus-square</span><span class="use">Clip / upload</span></div>
+        <div class="icell"><i data-lucide="user"></i><span class="nm">user</span><span class="use">Profile</span></div>
+        <div class="icell"><i data-lucide="heart"></i><span class="nm">heart</span><span class="use">Like</span></div>
+        <div class="icell"><i data-lucide="message-square"></i><span class="nm">message-square</span><span class="use">Reply</span></div>
+        <div class="icell"><i data-lucide="share-2"></i><span class="nm">share-2</span><span class="use">Share</span></div>
+        <div class="icell"><i data-lucide="shield-check"></i><span class="nm">shield-check</span><span class="use">Proof Card</span></div>
+        <div class="icell"><i data-lucide="badge-check"></i><span class="nm">badge-check</span><span class="use">VERIFIED</span></div>
+        <div class="icell"><i data-lucide="rotate-ccw"></i><span class="nm">rotate-ccw</span><span class="use">OVERTURNED</span></div>
+        <div class="icell"><i data-lucide="ban"></i><span class="nm">ban</span><span class="use">REJECTED</span></div>
+        <div class="icell"><i data-lucide="alert-triangle"></i><span class="nm">alert-triangle</span><span class="use">NEEDS_REVIEW</span></div>
+        <div class="icell"><i data-lucide="clock"></i><span class="nm">clock</span><span class="use">Match clock</span></div>
+        <div class="icell"><i data-lucide="hash"></i><span class="nm">hash</span><span class="use">Seq / event id</span></div>
+        <div class="icell"><i data-lucide="scan-line"></i><span class="nm">scan-line</span><span class="use">OCR step</span></div>
+        <div class="icell"><i data-lucide="gavel"></i><span class="nm">gavel</span><span class="use">Controversy</span></div>
+        <div class="icell"><i data-lucide="zap"></i><span class="nm">zap</span><span class="use">Impact</span></div>
+        <div class="icell"><i data-lucide="link"></i><span class="nm">link</span><span class="use">Solana anchor</span></div>
+        <div class="icell"><i data-lucide="wallet"></i><span class="nm">wallet</span><span class="use">Sponsor budget</span></div>
+        <div class="icell"><i data-lucide="copy"></i><span class="nm">copy</span><span class="use">Copy hash</span></div>
+        <div class="icell"><i data-lucide="radio"></i><span class="nm">radio</span><span class="use">LIVE match</span></div>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Try next: "make the loader faster / slower" · "show the Solana anchor row with a copy button" · "use these icons on the Proof Card" · "swap an icon"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">SIUUU — TikTok-style app, mobile</span></div>
+  <p class="dv-tsub">Reframed around your sketch: a full-screen vertical video feed with Home / Clip / Profile tabs. Lo-fi structure hinting at the neobrutalist system — hard ink borders, offset shadows (no blur), radius 0, mono for all feed/machine data, pill badges as tappable stamps. Colour is information only: <b style="color:#00a83c">verified green</b>, <b style="color:#FF006E">impact magenta</b>, <b style="color:#FF4D00">controversy orange</b>, <b style="color:#6D3BFF">sponsor violet</b>. The verify pipeline (1d) runs after upload. Content anchored on the France–Spain VAR overturn (Impact 1 · Controversy 90).</p>
+
+  <div class="dv-opts">
+
+    <!-- ============ 1a HOME ============ -->
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Home — vertical video feed</div>
+      <div class="col" style="gap:8px">
+        <div class="dv-cap">swipe up = next clip</div>
+        <div class="phone">
+          <div class="screen">
+            <div class="phd" style="flex:1;position:relative">
+              VIDEO
+              <!-- top bar -->
+              <div class="row" style="position:absolute;top:0;left:0;right:0;justify-content:space-between;align-items:center;padding:16px 16px">
+                <span class="disp" style="font-size:22px;color:#fff;letter-spacing:-.5px">SIUUU</span>
+                <span class="pill" style="background:#FDFBF7;font-size:9px;padding:5px 12px">LOGIN</span>
+              </div>
+              <!-- status badge -->
+              <span class="pill" style="position:absolute;top:56px;left:16px;background:#FF4D00;font-size:10px">OVERTURNED · TAP</span>
+              <!-- right action rail -->
+              <div class="col" style="position:absolute;right:14px;bottom:150px;gap:16px;align-items:center">
+                <div class="col" style="align-items:center;gap:4px"><div class="railbtn"><i data-lucide="heart"></i></div><span class="mono" style="font-size:9px;color:#fff">12k</span></div>
+                <div class="col" style="align-items:center;gap:4px"><div class="railbtn"><i data-lucide="message-square"></i></div><span class="mono" style="font-size:9px;color:#fff">840</span></div>
+                <div class="col" style="align-items:center;gap:4px"><div class="railbtn" style="background:#FF4D00;color:#111;border-color:#111">PROOF</div><span class="mono" style="font-size:9px;color:#fff">open</span></div>
+                <div class="col" style="align-items:center;gap:4px"><div class="railbtn"><i data-lucide="share-2"></i></div><span class="mono" style="font-size:9px;color:#fff">share</span></div>
+              </div>
+              <!-- impact / controv -->
+              <div class="row" style="position:absolute;right:14px;top:56px;gap:6px">
+                <span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">1</span>
+                <span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:3px 6px;font-size:12px;font-weight:700">90</span>
+              </div>
+              <!-- bottom caption -->
+              <div class="col" style="position:absolute;left:16px;right:80px;bottom:20px;gap:6px">
+                <span style="color:#fff;font-weight:700;font-size:14px;line-height:1.25">France 2–2 Spain — the phantom equaliser</span>
+                <span class="mono" style="font-size:10px;color:rgba(255,255,255,.8)">24:32 · goal → action_discarded · Seq 534</span>
+              </div>
+              <!-- watermark -->
+              <span class="mono" style="position:absolute;bottom:20px;right:14px;font-size:10px;color:rgba(255,255,255,.55);writing-mode:vertical-rl">SIUUU · @clipper</span>
+            </div>
+            <div class="nav">
+              <div class="navitem on"><i data-lucide="home"></i>Home</div>
+              <div class="navitem"><i data-lucide="plus-square"></i>Clip</div>
+              <div class="navitem"><i data-lucide="user"></i>Profile</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1b CLIP / UPLOAD ============ -->
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Clip — upload &amp; publish</div>
+      <div class="col" style="gap:8px">
+        <div class="dv-cap">post → OCR → verify → home</div>
+        <div class="phone">
+          <div class="screen">
+            <div class="row" style="justify-content:space-between;align-items:center;padding:16px 16px;border-bottom:3px solid #111">
+              <span class="disp" style="font-size:22px;letter-spacing:-.5px">SIUUU</span>
+              <span class="pill" style="font-size:9px;padding:5px 12px">LOGIN</span>
+            </div>
+            <div class="col" style="flex:1;padding:16px;gap:14px;overflow:hidden">
+              <div class="ph b3" style="border:3px solid #111;height:210px;flex-direction:column;gap:8px">
+                <span class="disp" style="font-size:26px;color:rgba(0,0,0,.55)">UPLOAD</span>
+                <span class="mono" style="font-size:10px">tap to record · or import clip</span>
+              </div>
+              <div class="col" style="gap:5px">
+                <span class="lbl" style="color:rgba(0,0,0,.5)">TITLE</span>
+                <div class="ph" style="border:3px solid #111;height:40px;justify-content:flex-start;padding-left:12px;background:#fff">Phantom equaliser, 24:32</div>
+              </div>
+              <div class="col" style="gap:5px">
+                <span class="lbl" style="color:rgba(0,0,0,.5)">DESCRIPTION</span>
+                <div class="ph" style="border:3px solid #111;height:56px;justify-content:flex-start;align-items:flex-start;padding:10px 12px;background:#fff">what the ref actually saw…</div>
+              </div>
+              <div class="col" style="gap:6px">
+                <span class="lbl" style="color:#6D3BFF">SPONSOR CAROUSEL · pick a campaign</span>
+                <div class="row" style="gap:8px;align-items:center">
+                  <span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span>
+                  <span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span>
+                  <span class="chip" style="border-color:#6D3BFF;box-shadow:3px 3px 0 #6D3BFF;font-size:11px;padding:7px 10px">Sponsor</span>
+                  <span class="mono" style="font-size:14px;color:#6D3BFF">›</span>
+                </div>
+              </div>
+            </div>
+            <div class="col" style="padding:14px 16px;gap:8px;border-top:3px solid #111">
+              <div class="row" style="justify-content:center;align-items:center;background:#111;color:#FDFBF7;height:48px;border:2px solid #111;box-shadow:4px 4px 0 #6D3BFF"><span class="lbl" style="font-size:13px;color:#FDFBF7">POST — START VERIFICATION</span></div>
+              <span class="mono" style="font-size:9.5px;color:rgba(0,0,0,.5);text-align:center">on post: OCR reads the overlay → matched against TXOdd feed → anchored on Solana</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1c PROFILE ============ -->
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Profile</div>
+      <div class="col" style="gap:8px">
+        <div class="dv-cap">clips · verified · impact</div>
+        <div class="phone">
+          <div class="screen">
+            <div class="row" style="justify-content:space-between;align-items:center;padding:16px 16px;border-bottom:3px solid #111">
+              <span class="disp" style="font-size:22px;letter-spacing:-.5px">SIUUU</span>
+              <span class="pill" style="font-size:9px;padding:5px 12px">LOGIN</span>
+            </div>
+            <div class="col" style="flex:1;padding:18px 16px;gap:16px;overflow:hidden">
+              <div class="col" style="align-items:center;gap:8px">
+                <div class="ph" style="width:78px;height:78px;border:3px solid #111;border-radius:999px">avatar</div>
+                <span style="font-weight:700;font-size:15px">@clipper</span>
+                <div class="row" style="gap:0;border:2px solid #111;box-shadow:3px 3px 0 #111">
+                  <div class="col" style="align-items:center;padding:6px 14px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:14px">128</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">CLIPS</span></div>
+                  <div class="col" style="align-items:center;padding:6px 14px;border-right:2px solid #111"><span class="mono" style="font-weight:700;font-size:14px;color:#00a83c">96</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">VERIFIED</span></div>
+                  <div class="col" style="align-items:center;padding:6px 14px"><span class="mono" style="font-weight:700;font-size:14px;color:#FF006E">4.2k</span><span class="lbl" style="font-size:8px;color:rgba(0,0,0,.5)">IMPACT</span></div>
+                </div>
+              </div>
+              <div class="col" style="gap:6px">
+                <span class="lbl" style="color:#6D3BFF">ENGAGED SPONSORS</span>
+                <div class="row" style="gap:8px;align-items:center;overflow:hidden">
+                  <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF;flex:none">S1</div>
+                  <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF;flex:none">S2</div>
+                  <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF;flex:none">S3</div>
+                  <div class="ph" style="width:46px;height:46px;border:2px solid #6D3BFF;flex:none">S4</div>
+                  <span class="mono" style="font-size:14px;color:#6D3BFF">›</span>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:120px;border-bottom:3px solid #111;position:relative">user video<span class="pill" style="position:absolute;top:6px;left:6px;background:#FF4D00;font-size:8px;padding:2px 7px">OVERTURNED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">1</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">90</span></div></div>
+                <div class="col b3" style="border:3px solid #111;box-shadow:4px 4px 0 #111"><div class="ph" style="height:120px;border-bottom:3px solid #111;position:relative">user video<span class="pill" style="position:absolute;top:6px;left:6px;background:#00E054;font-size:8px;padding:2px 7px">VERIFIED</span></div><div class="row" style="padding:6px 8px;gap:5px"><span class="mono" style="background:#FF006E;color:#fff;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">78</span><span class="mono" style="background:#FF4D00;color:#111;border:2px solid #111;padding:1px 5px;font-size:10px;font-weight:700">12</span></div></div>
+              </div>
+            </div>
+            <div class="nav">
+              <div class="navitem"><i data-lucide="home"></i>Home</div>
+              <div class="navitem"><i data-lucide="plus-square"></i>Clip</div>
+              <div class="navitem on"><i data-lucide="user"></i>Profile</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 1d VERIFY PIPELINE STORYBOARD ============ -->
+    <div class="dv-opt" id="1d">
+      <div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Post → verify pipeline (what happens after upload)</div>
+      <div class="col" style="gap:14px">
+        <div class="dv-cap">6 discrete steps · each lands with a hard snap · no spinners</div>
+        <div class="col" style="width:560px;gap:0;border:3px solid #111;box-shadow:8px 8px 0 #111;background:#FDFBF7">
+          <div class="row" style="justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:3px solid #111">
+            <span class="lbl" style="font-size:12px">VERIFYING CLIP</span>
+            <span class="mono" style="font-size:11px;color:rgba(0,0,0,.6)">fixture 18209181 · 24:32</span>
+          </div>
+          <!-- steps -->
+          <div class="col" style="padding:6px 0">
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)">
+              <span class="mono" style="width:26px;font-weight:700">1</span>
+              <span style="flex:1;font-weight:700;font-size:13px">OCR — read overlay clock &amp; score</span>
+              <span class="pill" style="background:#00E054;font-size:9px">DONE</span>
+              <span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:120px;text-align:right">read “24:32 · 2–2”</span>
+            </div>
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1)">
+              <span class="mono" style="width:26px;font-weight:700">2</span>
+              <span style="flex:1;font-weight:700;font-size:13px">Resolve — locate fixture window</span>
+              <span class="pill" style="background:#00E054;font-size:9px">DONE</span>
+              <span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:120px;text-align:right">24:32–25:02</span>
+            </div>
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1);background:#F0EDE6">
+              <span class="mono" style="width:26px;font-weight:700">3</span>
+              <span style="flex:1;font-weight:700;font-size:13px">Match — query TXOdd feed</span>
+              <span class="pill" style="background:#FFD600;font-size:9px">RUNNING</span>
+              <span class="mono" style="font-size:11px;color:rgba(0,0,0,.55);width:120px;text-align:right">goal→discarded?</span>
+            </div>
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1);opacity:.4">
+              <span class="mono" style="width:26px;font-weight:700">4</span>
+              <span style="flex:1;font-weight:700;font-size:13px">Drama — Impact &amp; Controversy</span>
+              <span class="pill" style="background:#E5E5E5;font-size:9px">WAITING</span>
+              <span class="mono" style="font-size:11px;width:120px"></span>
+            </div>
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.1);opacity:.4">
+              <span class="mono" style="width:26px;font-weight:700">5</span>
+              <span style="flex:1;font-weight:700;font-size:13px">Proof — build Proof Card</span>
+              <span class="pill" style="background:#E5E5E5;font-size:9px">WAITING</span>
+              <span class="mono" style="font-size:11px;width:120px"></span>
+            </div>
+            <div class="row" style="align-items:center;gap:14px;padding:12px 18px;opacity:.4">
+              <span class="mono" style="width:26px;font-weight:700">6</span>
+              <span style="flex:1;font-weight:700;font-size:13px">Publish — anchor on Solana, post to Home</span>
+              <span class="pill" style="background:#E5E5E5;font-size:9px">WAITING</span>
+              <span class="mono" style="font-size:11px;width:120px"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- end states -->
+        <div class="dv-cap" style="margin-top:6px">two possible endings</div>
+        <div class="row" style="gap:20px">
+          <div class="col" style="width:270px;border:3px solid #111;box-shadow:4px 4px 0 #111;background:#fff;padding:14px;gap:10px">
+            <span class="pill" style="background:#FF4D00;align-self:flex-start">OVERTURNED</span>
+            <span class="mono" style="font-size:11px;line-height:1.5;color:rgba(0,0,0,.7)">goal Seq 534 (24:32)<br>→ action_discarded Seq 561 (25:58)<br>Impact <b style="color:#FF006E">1</b> · Controversy <b style="color:#FF4D00">90</b></span>
+            <span class="mono" style="font-size:10px;color:rgba(0,0,0,.5)">→ appears on Home with Proof Card</span>
+          </div>
+          <div class="col" style="width:270px;border:3px solid #111;box-shadow:4px 4px 0 #111;background:#fff;padding:14px;gap:10px">
+            <span class="pill" style="background:#E5E5E5;align-self:flex-start">REJECTED</span>
+            <span class="mono" style="font-size:11px;line-height:1.5;color:rgba(0,0,0,.7)">no backing event at 24:32<br>TXOdd has: throw_in, Seq 412<br>—</span>
+            <span class="mono" style="font-size:10px;color:rgba(0,0,0,.5)">→ not published. reason shown to clipper.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="dv-next">Try next: "flesh out the Proof Card that <a class="dv-oid" href="#1a">1a</a>'s PROOF button opens" · "add a desktop layout for <a class="dv-oid" href="#1b">1b</a>" · "show the sponsor campaign builder" · "make <a class="dv-oid" href="#1d">1d</a> an animated stepper" · "new directions for Home"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    this._icons();
+    this._cur = 1;
+    this._tick();
+    this._timer = setInterval(() => {
+      this._cur = this._cur >= 7 ? 1 : this._cur + 1;
+      this._tick();
+    }, 850);
+  }
+  componentWillUnmount() { clearInterval(this._timer); }
+  _icons() {
+    if (window.lucide) window.lucide.createIcons();
+    else this._iconTimer = setTimeout(() => this._icons(), 120);
+  }
+  _tick() {
+    const S = { done: ['DONE', '#00E054'], run: ['RUNNING', '#FFD600'], wait: ['WAITING', '#E5E5E5'] };
+    document.querySelectorAll('[data-vstep]').forEach((row) => {
+      const i = +row.getAttribute('data-vstep');
+      const s = i < this._cur ? 'done' : (i === this._cur ? 'run' : 'wait');
+      const badge = row.querySelector('[data-vbadge]');
+      if (badge) { badge.textContent = S[s][0]; badge.style.background = S[s][1]; }
+      row.style.opacity = s === 'wait' ? '0.4' : '1';
+      row.style.background = s === 'run' ? '#F0EDE6' : 'transparent';
+    });
+    document.querySelectorAll('[data-vseg]').forEach((seg) => {
+      const i = +seg.getAttribute('data-vseg');
+      seg.style.background = i < this._cur ? '#00E054' : (i === this._cur ? '#FFD600' : '#E5E5E5');
+    });
+  }
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

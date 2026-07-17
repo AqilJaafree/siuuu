@@ -168,7 +168,10 @@ Run: `npx vitest run tests/chain/config.test.ts` → FAIL, cannot resolve `confi
 
 ```ts
 import { PublicKey } from '@solana/web3.js'
-import { BN } from '@coral-xyz/anchor'
+// NOT `import { BN } from '@coral-xyz/anchor'` — that is what the docs show and it
+// throws "does not provide an export named 'BN'" under ESM. Destructuring the
+// namespace (`const { BN } = anchor`) then fails with "BN is not a constructor".
+import BN from 'bn.js'
 
 export type Network = 'mainnet' | 'devnet'
 
@@ -243,64 +246,90 @@ git commit -m "feat(chain): network config and TxLINE PDAs"
 
 **Files:** Create `src/chain/statkey.ts`, `tests/chain/statkey.test.ts`
 
-**This is the join Plan 1 left open.** A ProofCard says "red card at clock 4280,
-Seq 687". `validateStat` needs `(fixtureId, seq, statKey)`. `seq` comes from the
-ProofCard's `seqRange`. `statKey` must be derived from the claim kind, the
-participant, and the period.
+**This task was rewritten after `scripts/probe-stat-validation.ts` ran against the
+live devnet feed. The original version used the documented period multipliers and
+would have produced `value: 0` for every claim.**
 
-**Read skill §8 first.** `statKey = period * 1000 + base`.
+### What the probe found
+
+The docs (skill §8) say `statKey = period * 1000 + base`, H2 → `+2000`. So the
+mistaken-identity red card (18222446, seq 687, P2, StatusId 4 = H2) should be
+`2006`. The live endpoint disagrees:
+
+```
+statKey    6 -> value 1   <-- proves the red card
+statKey 2006 -> value 0   <-- what the docs imply. Empty.
+statKey 3006 -> value 1   <-- where it actually lives
+statKey 4006 -> value 0
+statKey    5 -> value 0   (P1 reds — correctly zero)
+```
+
+Empirically the live prefix is H1 → 1 *and* 2, H2 → **3**, ET1 → **4**, ET2 → **5**.
+The documented mapping is off by one from reality, and prefixes 1/2 both move during
+H1 (mirroring the `Score` object's `H1`/`HT` cumulative keys).
+
+### The design consequence: use the TOTALS
+
+**`statKey 6` — the un-prefixed total — proves the red card exactly as well as
+`3006`, and sidesteps the broken period encoding entirely.** Totals are 1–8, are
+unambiguous, and do not depend on decoding a scheme whose documentation is wrong.
+
+This costs nothing, because **`validateStat` takes a `seq`** — it proves the total
+*as of that sequence number*. "P2's red-card total was 1 as of seq 687" is exactly
+the fact a red-card claim needs, and the ProofCard already carries `seqRange` from
+Plan 1.
+
+> **Optional hardening, if time allows:** prove the *transition*. `key 6 = 0` at
+> seq 686 and `= 1` at seq 687 pins the card to that seq rather than merely "by"
+> it. Two proofs instead of one. Not needed for the demo; note it and move on.
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
 import { describe, it, expect } from 'vitest'
-import { statKeyFor, periodMultiplier, PROVABLE_CLAIMS } from '../../src/chain/statkey.js'
+import { statKeyFor, PROVABLE_CLAIMS } from '../../src/chain/statkey.js'
 
-describe('periodMultiplier — from StatusId', () => {
-  it('maps play phases to their multiplier', () => {
-    expect(periodMultiplier(2)).toBe(1000)  // H1
-    expect(periodMultiplier(4)).toBe(2000)  // H2
-    expect(periodMultiplier(7)).toBe(3000)  // ET1
-    expect(periodMultiplier(9)).toBe(4000)  // ET2
-    expect(periodMultiplier(12)).toBe(5000) // PE — shootout
+describe('statKeyFor — totals, not period-prefixed', () => {
+  it('red card, participant 2 -> 6 (verified against the live endpoint)', () => {
+    expect(statKeyFor('red_card', 2)).toBe(6)
   })
 
-  it('returns null for non-play phases', () => {
-    expect(periodMultiplier(1)).toBeNull()  // NS
-    expect(periodMultiplier(3)).toBeNull()  // HT
-    expect(periodMultiplier(6)).toBeNull()  // WET — waiting, no play
-  })
-})
-
-describe('statKeyFor', () => {
-  it('red card, participant 2, second half -> 2006', () => {
-    expect(statKeyFor('red_card', 2, 4)).toBe(2006)
+  it('red card, participant 1 -> 5', () => {
+    expect(statKeyFor('red_card', 1)).toBe(5)
   })
 
-  it('goal, participant 1, first half -> 1001', () => {
-    expect(statKeyFor('goal', 1, 2)).toBe(1001)
+  it('goal -> 1 / 2', () => {
+    expect(statKeyFor('goal', 1)).toBe(1)
+    expect(statKeyFor('goal', 2)).toBe(2)
   })
 
-  it('yellow card, participant 1, extra time 1 -> 3003', () => {
-    expect(statKeyFor('yellow_card', 1, 7)).toBe(3003)
+  it('yellow card -> 3 / 4', () => {
+    expect(statKeyFor('yellow_card', 1)).toBe(3)
+    expect(statKeyFor('yellow_card', 2)).toBe(4)
+  })
+
+  it('never returns a period-prefixed key', () => {
+    // 2006 is what the docs imply and the live endpoint reports it EMPTY.
+    // If this ever returns > 8, the period encoding has crept back in.
+    for (const kind of ['goal', 'yellow_card', 'red_card'] as const) {
+      for (const p of [1, 2] as const) {
+        expect(statKeyFor(kind, p)!).toBeLessThanOrEqual(8)
+      }
+    }
   })
 
   it('returns null for claims with no Merkle-backed stat', () => {
-    // THE POINT OF THIS MODULE. There is no statKey for a VAR decision.
-    expect(statKeyFor('var_overturned_goal', 1, 4)).toBeNull()
-    expect(statKeyFor('mistaken_identity', 1, 4)).toBeNull()
-    expect(statKeyFor('var_stands', 1, 4)).toBeNull()
-    expect(statKeyFor('goal_withdrawn', 1, 4)).toBeNull()
-  })
-
-  it('returns null when the phase carries no period', () => {
-    expect(statKeyFor('goal', 1, 3)).toBeNull() // halftime
+    // The point of this module. There is no statKey for a VAR decision.
+    expect(statKeyFor('var_overturned_goal', 1)).toBeNull()
+    expect(statKeyFor('mistaken_identity', 1)).toBeNull()
+    expect(statKeyFor('var_stands', 1)).toBeNull()
+    expect(statKeyFor('goal_withdrawn', 1)).toBeNull()
   })
 })
 
 describe('PROVABLE_CLAIMS', () => {
   it('names exactly the claims a Merkle proof can back', () => {
-    expect([...PROVABLE_CLAIMS].sort()).toEqual(['goal', 'penalty_outcome', 'red_card', 'yellow_card'])
+    expect([...PROVABLE_CLAIMS].sort()).toEqual(['goal', 'red_card', 'yellow_card'])
   })
 })
 ```
@@ -313,25 +342,17 @@ describe('PROVABLE_CLAIMS', () => {
 import type { ClaimKind } from '../verify/types.js'
 
 /**
- * StatusId -> period multiplier (skill §8).
+ * Un-prefixed TOTAL stat keys. Verified against the live devnet endpoint.
  *
- * Only PLAY phases have a period. 6 (WET) is *waiting for* extra time — no play, so
- * no stat accrues. An earlier version of the feed analysis had 6 as "extra time 1st
- * half"; it is not, and a build trusting that mis-slices the knockout rounds.
+ * Do NOT reintroduce period prefixes. The docs say `period * 1000 + base` with
+ * H2 -> +2000, which would make a P2 second-half red card 2006. The live endpoint
+ * reports 2006 EMPTY and the card at 3006 — the documented mapping is off by one
+ * from reality (measured: H1 -> 1 and 2, H2 -> 3, ET1 -> 4, ET2 -> 5).
+ *
+ * Totals sidestep the whole broken scheme and cost nothing: validateStat proves
+ * the total AS OF a given `seq`, which is exactly the fact a claim needs.
  */
-export function periodMultiplier(statusId: number | null): number | null {
-  switch (statusId) {
-    case 2: return 1000  // H1
-    case 4: return 2000  // H2
-    case 7: return 3000  // ET1
-    case 9: return 4000  // ET2
-    case 12: return 5000 // PE — penalty shootout. UNTESTED by the corpus.
-    default: return null // NS, HT, WET, HTET, F, FET, and all terminal states
-  }
-}
-
-/** Base stat keys (skill §8). P1/P2 pairs. */
-const BASE: Record<string, [number, number]> = {
+const TOTAL_KEYS: Record<string, [p1: number, p2: number]> = {
   goal: [1, 2],
   yellow_card: [3, 4],
   red_card: [5, 6],
@@ -339,56 +360,45 @@ const BASE: Record<string, [number, number]> = {
 }
 
 /**
- * The claims a Merkle proof can back.
+ * Claims a Merkle proof can back.
  *
- * There is NO statKey for a VAR decision. `var_overturned_goal`,
- * `mistaken_identity`, `var_stands` and `goal_withdrawn` are feed-attested only —
- * TxODDS's operator said so, and we anchor a hash of them saying it. That is a
- * weaker guarantee than a Merkle proof and must never be rendered as if it were.
+ * There is NO statKey for a VAR decision, so `var_overturned_goal`,
+ * `mistaken_identity`, `var_stands` and `goal_withdrawn` are feed-attested only.
+ * That is a weaker guarantee and must never be rendered as if it were a proof.
  */
-export const PROVABLE_CLAIMS: ReadonlySet<ClaimKind> = new Set([
-  'goal', 'red_card', 'yellow_card', 'penalty_outcome',
-] as unknown as ClaimKind[])
+export const PROVABLE_CLAIMS: ReadonlySet<string> = new Set(['goal', 'red_card', 'yellow_card'])
 
 /**
- * (claim, participant, phase) -> statKey, or null when no Merkle-backed stat exists.
+ * (claim, participant) -> statKey, or null when no Merkle-backed stat exists.
  *
- * Null is not a failure. It is the honest answer for a VAR claim, and the caller
- * must surface it as "feed-attested" rather than silently downgrading to unproven.
+ * Null is not a failure — it is the honest answer for a VAR claim. The caller must
+ * surface it as FEED_ATTESTED rather than silently downgrading to unproven.
  */
-export function statKeyFor(
-  kind: ClaimKind | 'penalty_outcome',
-  participant: 1 | 2,
-  statusId: number | null,
-): number | null {
-  const base = BASE[kind as string]
-  if (!base) return null
-  const period = periodMultiplier(statusId)
-  if (period === null) return null
-  return period + base[participant - 1]
+export function statKeyFor(kind: ClaimKind | string, participant: 1 | 2): number | null {
+  const keys = TOTAL_KEYS[kind]
+  return keys ? keys[participant - 1] : null
 }
 ```
 
 - [ ] **Step 4: Run it, confirm pass.**
 
-- [ ] **Step 5: Verify against the corpus by hand**
+- [ ] **Step 5: Cross-check against the live endpoint**
 
-The marquee red card is 18222446 `Id` 613, `Seq` 687, clock 4280, `StatusId` 4 (H2).
-Confirm `statKeyFor('red_card', <its participant>, 4)` gives `2005` or `2006`
-depending on side, and that the number matches the `Stats` map in that frame:
+`scripts/probe-stat-validation.ts` already does this. Run it and confirm `statKey 6`
+still returns `value 1` for 18222446 / seq 687:
 
 ```bash
-grep -o '"Seq":687[^}]*' exact-match-txline-raw/txline-raw/18222446/scores.ndjson | head -1
+npx tsx scripts/probe-stat-validation.ts
 ```
 
-Cross-check the `Stats` object at that `Seq` actually carries a 1 at the key you
-computed. **If it does not, the mapping is wrong — stop and report.**
+**If the sweep ever shows a different key carrying the card, the mapping changed —
+stop and re-derive rather than adjusting the test.**
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/chain/statkey.ts tests/chain/statkey.test.ts
-git commit -m "feat(chain): map claims to Merkle-backed statKeys, honestly"
+git commit -m "feat(chain): map claims to Merkle-backed total statKeys"
 ```
 
 ---
@@ -397,7 +407,23 @@ git commit -m "feat(chain): map claims to Merkle-backed statKeys, honestly"
 
 **Files:** Create `src/chain/validate.ts`, `tests/chain/validate.test.ts`
 
-**Read skill §7 in full before writing this.**
+**Read skill §7 in full before writing this — then note where it is wrong.**
+
+`scripts/probe-stat-validation.ts` proved this flow end to end on devnet. Three
+gaps between the docs and reality, all found by running it:
+
+1. **The docs never create the TxL ATA.** `subscribe` fails `AccountNotInitialized`
+   (3012) without it, before it looks at the service level. The free tier charges no
+   TxL, but the account must exist. Use
+   `createAssociatedTokenAccountIdempotentInstruction` with `TOKEN_2022_PROGRAM_ID`.
+2. **The on-chain IDL declares no `returns` for `validate_stat`**, so Anchor's
+   `.view()` rejects it — yet the docs' example calls `.view()` and reads a bool.
+   The patched IDL is vendored at `idl/txoracle-devnet.json` with `returns: 'bool'`
+   added. Do not re-fetch it with `anchor idl fetch` and expect `.view()` to work.
+3. **`toBytes32` must accept byte ARRAYS** — proof hashes do not arrive as strings.
+
+Also: the response's `period` field echoes **StatusId**, not the key's period. It
+read `4` for every key in the sweep. Do not use it to derive a statKey.
 
 - [ ] **Step 1: Write the test (network-gated)**
 

@@ -18,10 +18,15 @@ export function ConnectButton({ dark = false }: { dark?: boolean }) {
   const { publicKey, connected, connecting, disconnect } = useWallet()
   const { setVisible } = useWalletModal()
 
-  // `dark` = sitting on the feed's photo backdrop, which is dark in both themes, so
-  // it takes fixed light chrome rather than the theme's ink.
+  // `dark` = sitting on the feed's photo backdrop, which is dark in BOTH themes, so
+  // this chrome must be fixed — it cannot follow the theme.
+  //
+  // It previously paired `background: var(--paper)` with a hardcoded `#111` text.
+  // --paper flips to #0a0a0a in dark mode while #111 does not, so the connected
+  // pubkey rendered near-black on near-black. Both values are now literals: a token
+  // that flips can never be paired with a colour that doesn't.
   const shell = dark
-    ? { background: 'var(--paper)', color: '#111', boxShadow: '3px 3px 0 rgba(0,0,0,.4)' }
+    ? { background: '#fdfbf7', color: '#111', boxShadow: '3px 3px 0 rgba(0,0,0,.45)' }
     : { background: 'var(--card)', color: 'var(--ink)', boxShadow: '3px 3px 0 var(--ink)' }
 
   if (connected && publicKey) {

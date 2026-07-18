@@ -2,8 +2,12 @@
 
 import { useState } from 'react'
 import { Link as LinkIcon, X } from 'lucide-react'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import type { FeedClip } from '../app/lib/feed.js'
 import { STATUS_FILL, TIER_COPY, clock, clockSpoken, pillClass, truncateMiddle } from '../app/lib/format.js'
+import { claimMessage } from '../src/proof/claimant.js'
+import { signClaim } from '../app/actions.js'
 
 /**
  * The Proof Card. Where the product either earns trust or doesn't.
@@ -12,7 +16,15 @@ import { STATUS_FILL, TIER_COPY, clock, clockSpoken, pillClass, truncateMiddle }
  * names friendly". All of it is resisted here on purpose: a Proof Card that looks
  * designed looks authored, and authored means someone could have written anything.
  */
-export function ProofSheet({ clip, onClose }: { clip: FeedClip | null; onClose: () => void }) {
+export function ProofSheet({
+  clip,
+  onClose,
+  onUpdate,
+}: {
+  clip: FeedClip | null
+  onClose: () => void
+  onUpdate: (clip: FeedClip) => void
+}) {
   const [copied, setCopied] = useState(false)
 
   const open = !!clip
@@ -56,7 +68,9 @@ export function ProofSheet({ clip, onClose }: { clip: FeedClip | null; onClose: 
           overflowY: 'auto',
         }}
       >
-        {clip && <ProofBody key={clip.id} clip={clip} onClose={onClose} copied={copied} setCopied={setCopied} />}
+        {clip && (
+          <ProofBody key={clip.id} clip={clip} onClose={onClose} onUpdate={onUpdate} copied={copied} setCopied={setCopied} />
+        )}
       </div>
     </div>
   )
@@ -65,11 +79,13 @@ export function ProofSheet({ clip, onClose }: { clip: FeedClip | null; onClose: 
 function ProofBody({
   clip,
   onClose,
+  onUpdate,
   copied,
   setCopied,
 }: {
   clip: FeedClip
   onClose: () => void
+  onUpdate: (clip: FeedClip) => void
   copied: boolean
   setCopied: (v: boolean) => void
 }) {
@@ -79,6 +95,53 @@ function ProofBody({
   // record that a call actually returned true. Rendering the strong branch on the
   // label alone would let a mislabelled card show proof coordinates it never earned.
   const proven = card.validation.tier === 'MERKLE_PROVEN' && card.validation.verifiedOnChain === true
+
+  // No local card state on purpose — App owns `clips` and is the source of truth.
+  // `onUpdate` lifts the freshly-signed card up; the `clip` prop then re-renders with
+  // it, the same way any other prop update would.
+  const { publicKey, signMessage } = useWallet()
+  const { setVisible } = useWalletModal()
+  const [signing, setSigning] = useState(false)
+  const [signError, setSignError] = useState<string | null>(null)
+
+  async function signAsClaimant() {
+    if (!publicKey || !signMessage) {
+      setVisible(true)
+      return
+    }
+    setSigning(true)
+    setSignError(null)
+    try {
+      const bytes = new TextEncoder().encode(
+        claimMessage({
+          fixtureId: card.fixtureId,
+          clockStart: card.clockStart,
+          clockEnd: card.clockEnd,
+          claimKind: card.claimKind,
+          contentHash: card.contentHash,
+        }),
+      )
+      const sig = await signMessage(bytes)
+      // base64 the detached signature (no Buffer in the browser bundle).
+      let bin = ''
+      for (const b of new Uint8Array(sig)) bin += String.fromCharCode(b)
+      const res = await signClaim(clip.id, { pubkey: publicKey.toBase58(), signature: btoa(bin) }, card.sponsor)
+      if ('error' in res) {
+        setSignError(res.error)
+        return
+      }
+      if (!res.accepted) {
+        setSignError('Signature did not verify — nothing recorded.')
+        return
+      }
+      onUpdate(res.clip)
+    } catch {
+      // User rejected in the wallet, or the wallet has no signMessage.
+      setSignError('Signing was cancelled.')
+    } finally {
+      setSigning(false)
+    }
+  }
 
   return (
     <div className="col" style={{ padding: 18, gap: 14 }}>
@@ -321,6 +384,29 @@ function ProofBody({
               ? 'A wallet signed this claim. The signature was verified before it was recorded, and the pubkey is inside the hash above — swap the claimant and the hash changes.'
               : 'No wallet signed this claim, so no author is credited. Unsigned is honest; a fabricated name would not be.'}
           </span>
+          {!card.claimant && (
+            <button
+              className="btn mono"
+              onClick={signAsClaimant}
+              disabled={signing}
+              style={{
+                width: '100%',
+                background: 'var(--paper)',
+                color: 'var(--ink)',
+                boxShadow: '2px 2px 0 var(--ink)',
+                fontSize: 10,
+                padding: '8px 10px',
+                marginTop: 4,
+              }}
+            >
+              {signing ? 'SIGNING…' : publicKey ? 'SIGN AS CLAIMANT' : 'CONNECT WALLET TO CLAIM'}
+            </button>
+          )}
+          {signError && (
+            <span className="mono" style={{ fontSize: 9, color: 'var(--rejected)' }}>
+              {signError}
+            </span>
+          )}
         </div>
       </div>
 

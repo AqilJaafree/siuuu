@@ -2,6 +2,7 @@ import 'server-only'
 import { proofHash, type ProofCard } from '../../src/proof/card.js'
 import type { VerifiedCard } from '../../src/cli/verify.js'
 import type { ClaimKind } from '../../src/verify/types.js'
+import { acceptClaimant, type Claimant } from '../../src/proof/claimant.js'
 import demoProofs from '../../src/generated/demo-proofs.json' with { type: 'json' }
 
 /**
@@ -151,7 +152,11 @@ const BY_KEY = new Map(PRECOMPUTED.map((c) => [key(c), c]))
  * placeholder card that claims something nobody computed. A missing card is a
  * regenerate-the-precompute problem, and it should stop the build.
  */
-export function cardFor(spec: DemoCase, sponsor: string | null = null): VerifiedCard {
+export function cardFor(
+  spec: DemoCase,
+  sponsor: string | null = null,
+  claimant: Claimant | null = null,
+): VerifiedCard {
   const hit = BY_KEY.get(key(spec))
   if (!hit) {
     throw new Error(
@@ -161,23 +166,43 @@ export function cardFor(spec: DemoCase, sponsor: string | null = null): Verified
   }
 
   const { title: _t, note: _n, ...card } = hit
-  return sponsor === null ? card : withSponsor(card)
+  // Fast path stays byte-identical for the existing no-override callers (loadFeed,
+  // and the precomputed-feed roundtrip test): nothing to re-hash if neither override
+  // is present.
+  return sponsor === null && claimant === null ? card : withOverrides(card)
 
   /**
-   * Re-attach the sponsor and re-hash.
+   * Re-attach the sponsor and/or claimant, then re-hash.
    *
    * Pure: `proofHash` is a canonical sha256 over the card's own fields and touches no
    * corpus. This produces the identical hash `runVerify` would have produced for the
-   * same claim with the same sponsor — the sponsor is inside the canonical bytes, so
-   * the card commits to which brand rides on it and a post-hoc swap is detectable.
+   * same claim with the same overrides — both are inside the canonical bytes, so the
+   * card commits to which brand rides on it and who signed it, and a post-hoc swap of
+   * either is detectable.
    */
-  function withSponsor(base: VerifiedCard): VerifiedCard {
+  function withOverrides(base: VerifiedCard): VerifiedCard {
     const { hash: _h, impactEvidence, controversyEvidence, ...proofCard } = base
-    // Mirrors `buildProofCard`: a refused claim carries no sponsor, ever. The clip
-    // still posts, with the refusal attached — no brand rides on an unbacked claim.
     const next: ProofCard = {
       ...proofCard,
+      // Mirrors `buildProofCard`: a refused claim carries no sponsor, ever. The clip
+      // still posts, with the refusal attached — no brand rides on an unbacked claim.
       sponsor: proofCard.status === 'REJECTED' ? null : sponsor,
+      // Verified HERE, at the one place a precomputed card is re-attached — mirrors
+      // buildProofCard's own rule that a signature nobody checks is theatre. An
+      // unverified signature is dropped to null, never trusted, no matter what the
+      // caller claims the signer to be. Unlike the sponsor, authorship survives
+      // REJECTED: whoever signed a refused claim still authored it, and a refusal is
+      // not a reason to un-credit the person who submitted it.
+      claimant: acceptClaimant(
+        {
+          fixtureId: proofCard.fixtureId,
+          clockStart: proofCard.clockStart,
+          clockEnd: proofCard.clockEnd,
+          claimKind: proofCard.claimKind,
+          contentHash: proofCard.contentHash,
+        },
+        claimant,
+      ),
     }
     return { ...next, hash: proofHash(next), impactEvidence, controversyEvidence }
   }

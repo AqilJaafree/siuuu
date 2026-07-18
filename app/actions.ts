@@ -2,6 +2,7 @@
 
 import { cardFor, findCase, type FeedClip } from './lib/feed.js'
 import { clock } from './lib/format.js'
+import type { Claimant } from '../src/proof/claimant.js'
 
 export type StepState = 'DONE' | 'REJECTED'
 
@@ -100,4 +101,24 @@ export async function verifyCase(
   ]
 
   return { clip: { ...spec, card }, steps }
+}
+
+/**
+ * Attach a wallet signature to a claim, verify it server-side, and return the re-hashed
+ * card. The signature is checked HERE before anything is recorded — a signature nobody
+ * verifies is theatre. `accepted` reports whether it actually verified, so the client
+ * can tell "your signature failed" apart from "unsigned".
+ *
+ * The sponsor already on the card is threaded back through so re-hashing preserves it —
+ * signing must not silently drop the brand that was riding on the claim.
+ */
+export async function signClaim(
+  id: string,
+  claimant: Claimant,
+  sponsor: string | null = null,
+): Promise<{ clip: FeedClip; accepted: boolean } | { error: string }> {
+  const spec = findCase(id)
+  if (!spec) return { error: `No such demo case: ${id}` }
+  const card = cardFor(spec, sponsor, claimant)
+  return { clip: { ...spec, card }, accepted: card.claimant !== null }
 }

@@ -25,6 +25,12 @@ export function App({ initialClips, cases }: { initialClips: FeedClip[]; cases: 
     setProofId(clip.id)
   }
 
+  function onCardUpdate(clip: FeedClip) {
+    // A card was re-signed in the sheet. Replace it in place — same id, same claim,
+    // now with an author bound into the hash. No tab change: the sheet stays open.
+    setClips((cs) => cs.map((c) => (c.id === clip.id ? clip : c)))
+  }
+
   return (
     <main
       className="row"
@@ -80,7 +86,7 @@ export function App({ initialClips, cases }: { initialClips: FeedClip[]; cases: 
             </NavItem>
           </nav>
 
-          <ProofSheet clip={proofClip} onClose={() => setProofId(null)} />
+          <ProofSheet clip={proofClip} onClose={() => setProofId(null)} onUpdate={onCardUpdate} />
         </div>
       </div>
     </main>

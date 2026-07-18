@@ -36,6 +36,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
     "axios": "^1.18.1",
+    "bs58": "^6.0.0",
     "lucide-react": "^1.24.0",
     "next": "^15.5.20",
     "react": "^19.2.7",

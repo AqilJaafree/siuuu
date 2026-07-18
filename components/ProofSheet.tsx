@@ -305,6 +305,25 @@ function ProofBody({
         </div>
       </div>
 
+      {/* The claimant. Inside the hash, so authorship is committed, not decoration —
+          swap the signer and the hash changes. Verified server-side before it was ever
+          recorded; an unsigned clip says so plainly rather than crediting no one silently. */}
+      <div className="col" style={{ gap: 6 }}>
+        <span className="lbl" style={{ opacity: 0.5 }}>
+          CLAIMED BY
+        </span>
+        <div className="sunk col" style={{ padding: '9px 10px', gap: 4 }}>
+          <span className="mono" style={{ fontSize: 11, fontWeight: 700 }}>
+            {card.claimant ? truncateMiddle(card.claimant.pubkey, 6, 6) : 'unsigned'}
+          </span>
+          <span className="mono" style={{ fontSize: 9, opacity: 0.65, lineHeight: 1.4 }}>
+            {card.claimant
+              ? 'A wallet signed this claim. The signature was verified before it was recorded, and the pubkey is inside the hash above — swap the claimant and the hash changes.'
+              : 'No wallet signed this claim, so no author is credited. Unsigned is honest; a fabricated name would not be.'}
+          </span>
+        </div>
+      </div>
+
       <div className="col" style={{ gap: 6 }}>
         <span className="lbl" style={{ opacity: 0.5 }}>
           PROOF HASH · SHA256

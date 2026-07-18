@@ -8,6 +8,7 @@ import { buildProofCard, proofHash, type ProofCard, type Validation } from '../p
 import { lookupProven, type ProvenStat } from '../chain/proven.js'
 import { PROVEN_STATS } from '../generated/proven-stats.js'
 import type { ClaimKind } from '../verify/types.js'
+import type { Claimant } from '../proof/claimant.js'
 
 export const CLAIM_KINDS: ClaimKind[] = [
   'goal', 'var_overturned_goal', 'var_overturned_penalty', 'mistaken_identity',
@@ -27,6 +28,8 @@ export interface CliArgs {
    * sponsor swapped after the fact produces a different hash.
    */
   sponsor?: string | null
+  /** The UNVERIFIED signature to check, or null/omitted. buildProofCard verifies it. */
+  claimant?: Claimant | null
 }
 
 export interface RunOpts {
@@ -153,6 +156,8 @@ export function runVerify(args: CliArgs, opts: RunOpts = {}): VerifiedCard {
     impact: impact?.score ?? 0,
     controversy,
     sponsor: args.sponsor ?? null,
+    // A signed claim commits its author into the hash; verified inside buildProofCard.
+    claimant: args.claimant,
     validation,
   })
 

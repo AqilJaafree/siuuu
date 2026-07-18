@@ -33,11 +33,12 @@
         "seq": 681,
         "network": "devnet"
       },
-      "hash": "cf2df98c7d073c99314fc7018d2b342f044e3cf4afafab6d07dd396113a9a6a7",
+      "hash": "29ce43aad0bac121c8110f52be87b56bc6f70dd32fc5c0066da78c5dc8048c9f",
       "impactEvidence": "1X2 [0.32,0.54,0.14] -> [0.46,0.47,0.07]  TVD 0.140  suspended 0s",
       "controversyEvidence": "var(MistakenIdentity) + Overturned",
       "title": "Referee cards the wrong player — VAR overrules",
-      "note": "Argentina QF · the only red card in the tournament capture"
+      "note": "Argentina QF · the only red card in the tournament capture",
+      "claimant": null
     },
     {
       "fixtureId": 18222446,
@@ -71,11 +72,12 @@
         "verifiedOnChain": true,
         "rootsPda": "FtnZq4V8mp56GUNEGGXfL1MuyT81cvoz59yeKn192HdH"
       },
-      "hash": "f7a8a947a6481e7d8729e55fe4807a9e87d7fd9fac76998f43650588b6d71d26",
+      "hash": "e902fe5420ab58e9f68e43b1a2958cc00d5c5235851eb74b417388c49707e671",
       "impactEvidence": "1X2 [0.32,0.54,0.14] -> [0.46,0.47,0.07]  TVD 0.140  suspended 0s",
       "controversyEvidence": "red_card · Seq 686",
       "title": "The red card itself — proven on Solana",
-      "note": "Argentina QF · statKey 6, proven against daily_scores_roots. The VAR reason next to it cannot be."
+      "note": "Argentina QF · statKey 6, proven against daily_scores_roots. The VAR reason next to it cannot be.",
+      "claimant": null
     },
     {
       "fixtureId": 18237038,
@@ -116,11 +118,12 @@
         "seq": 638,
         "network": "devnet"
       },
-      "hash": "0daa448d939e639ec84946764b41f5f898f76c28cc7d73622a066b0d1b0bc508",
+      "hash": "f7201c0d7fecec420f5a1a63f356f2a79b7f736698e67364b3c00031a815a163",
       "impactEvidence": "1X2 [0.03,0.10,0.86] -> [0.03,0.10,0.87]  TVD 0.004  suspended 0s",
       "controversyEvidence": "var(Goal) + Overturned",
       "title": "Spain goal overturned by VAR",
-      "note": "France 0-2 Spain, semi-final · the market did not move"
+      "note": "France 0-2 Spain, semi-final · the market did not move",
+      "claimant": null
     },
     {
       "fixtureId": 18209181,
@@ -154,11 +157,12 @@
         "verifiedOnChain": true,
         "rootsPda": "EUCbk9vftUek4vChr6rnXP9hhR8UuHGBDJKLsAQTZ9Zr"
       },
-      "hash": "d6a9953e6f6353a93944e95018009f47769bad011b49744c05253ebd334e6794",
+      "hash": "74fb56e667881370754b4e420fb0c3fefc8472f0e4dfb253ab4e0aced4aebfa4",
       "impactEvidence": "1X2 [0.86,0.12,0.02] -> [0.98,0.02,0.00]  TVD 0.119  suspended 0s",
       "controversyEvidence": "goal · Seq 793",
       "title": "France second goal",
-      "note": "France 2-0 Morocco, QF · the real clip we OCR tested"
+      "note": "France 2-0 Morocco, QF · the real clip we OCR tested",
+      "claimant": null
     },
     {
       "fixtureId": 18209181,
@@ -179,11 +183,12 @@
         "seq": -1,
         "network": "devnet"
       },
-      "hash": "1aec2d58373feae2824a16f8b8349867b2038633bae4a832320c5ade1c65b579",
+      "hash": "d57ef9452b02bb7a63b852ecb8bbaf8e634b0193f239f9697eb44359d7fa7f7d",
       "impactEvidence": "1X2 [0.62,0.28,0.10] -> [0.58,0.30,0.11]  TVD 0.034  suspended 0s",
       "controversyEvidence": null,
       "title": "Morocco goal ruled out — was it VAR?",
-      "note": "THE PRODUCT. A goal was withdrawn here, but no VAR backs it, so SIUUU refuses to claim VAR."
+      "note": "THE PRODUCT. A goal was withdrawn here, but no VAR backs it, so SIUUU refuses to claim VAR.",
+      "claimant": null
     }
   ]
 }

@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { buildProofCard, canonicalise, proofHash } from '../../src/proof/card.js'
 import type { ProofCard } from '../../src/proof/card.js'
+import nacl from 'tweetnacl'
+import bs58 from 'bs58'
+import { claimMessage } from '../../src/proof/claimant.js'
 
 const card = (): ProofCard => ({
   fixtureId: 18222446,
@@ -17,6 +20,7 @@ const card = (): ProofCard => ({
   controversy: 100,
   reason: 'VAR found mistaken identity and Overturned it at clock 4180-4272.',
   sponsor: null,
+  claimant: null,
   validation: { tier: 'FEED_ATTESTED', statKey: null, seq: 668, network: 'devnet' },
 })
 
@@ -165,5 +169,44 @@ describe('ProofCard v3 — the sponsor rides inside the hash', () => {
     const a = buildProofCard({ ...base, result: rejected, sponsor: 'adidas' })
     const b = buildProofCard({ ...base, result: rejected, sponsor: 'nike' })
     expect(proofHash(a)).toBe(proofHash(b))
+  })
+})
+
+describe('ProofCard v4 — authorship rides inside the hash', () => {
+  const base = {
+    fixtureId: 18222446, clockStart: 4260, clockEnd: 4290, claimKind: 'red_card' as const,
+    contentHash: 'a'.repeat(64), impact: 22, controversy: 70, sponsor: null,
+    validation: { tier: 'FEED_ATTESTED' as const, statKey: null, seq: 686, network: 'devnet' as const },
+    result: { status: 'VERIFIED' as const, reason: 'ok', matchedEvents: [], seqRange: [686, 686] as [number, number] },
+  }
+  const msg = claimMessage({
+    fixtureId: base.fixtureId, clockStart: base.clockStart, clockEnd: base.clockEnd,
+    claimKind: base.claimKind, contentHash: base.contentHash,
+  })
+  const sign = () => {
+    const kp = nacl.sign.keyPair()
+    return {
+      pubkey: bs58.encode(kp.publicKey),
+      signature: Buffer.from(nacl.sign.detached(new TextEncoder().encode(msg), kp.secretKey)).toString('base64'),
+    }
+  }
+
+  it('records a verified claimant and binds it into the hash', () => {
+    const c = sign()
+    const signed = buildProofCard({ ...base, claimant: c })
+    const unsigned = buildProofCard({ ...base })
+    expect(signed.claimant).toEqual(c)
+    expect(proofHash(signed)).not.toBe(proofHash(unsigned))
+  })
+
+  it('drops a forged claimant to null — a signature that does not verify is never recorded', () => {
+    // The load-bearing case: someone else's signature pasted under a real pubkey.
+    const real = sign()
+    const forged = { pubkey: real.pubkey, signature: sign().signature }
+    expect(buildProofCard({ ...base, claimant: forged }).claimant).toBeNull()
+  })
+
+  it('default is unsigned — an omitted claimant is null, not a crash', () => {
+    expect(buildProofCard({ ...base }).claimant).toBeNull()
   })
 })

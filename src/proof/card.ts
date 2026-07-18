@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { MatchedEvent, VerifyResult, VerifyStatus, ClaimKind } from '../verify/types.js'
+import { acceptClaimant, type Claimant } from './claimant.js'
 
 /**
  * How much a claim is actually worth.
@@ -61,6 +62,16 @@ export interface ProofCard {
    */
   sponsor: string | null
   /**
+   * Who signed this claim, verified server-side, or null.
+   *
+   * INSIDE the canonical serialisation, and therefore inside the hash — authorship is
+   * committed the same way the sponsor is. Swap the claimant and the hash changes, so
+   * a clip cannot be re-attributed after the fact. Null means unsigned, which is
+   * honest; a fabricated author is the false attribution this field exists to refuse.
+   * See src/proof/claimant.ts.
+   */
+  claimant: Claimant | null
+  /**
    * What the claim is actually backed by. Required, and inside the canonical
    * serialisation — the tier is bound into the hash, so a card cannot be silently
    * upgraded from attested to proven after the fact.
@@ -103,6 +114,11 @@ export interface BuildProofCardInput {
   controversy: number
   /** Explicit and required. There is no default sponsor — null means none. */
   sponsor: string | null
+  /**
+   * The UNVERIFIED signature to check, or null/omitted. buildProofCard verifies it
+   * before recording — an unverified claimant is dropped to null, never trusted.
+   */
+  claimant?: Claimant | null
   /** Explicit and required. There is no default tier — guessing one would overclaim. */
   validation: Validation
 }
@@ -126,6 +142,21 @@ export function buildProofCard(input: BuildProofCardInput): ProofCard {
     // not back. Dropped rather than thrown: rejection is a normal outcome of posting,
     // not a programming error.
     sponsor: input.result.status === 'REJECTED' ? null : input.sponsor,
+    // Verified HERE, at the single point every card is built — a signature nobody
+    // checks is theatre. acceptClaimant records the claimant only if the signature
+    // verifies against THIS exact claim; a forged or absent one becomes null. Unlike
+    // the sponsor, authorship survives rejection: whoever signed a refused claim still
+    // authored it, and crediting them is honest rather than an overclaim.
+    claimant: acceptClaimant(
+      {
+        fixtureId: input.fixtureId,
+        clockStart: input.clockStart,
+        clockEnd: input.clockEnd,
+        claimKind: input.claimKind,
+        contentHash: input.contentHash,
+      },
+      input.claimant,
+    ),
     validation: input.validation,
   }
 }
